@@ -153,7 +153,6 @@ php/Config/SqlConstants.inc
 
 install/tpl/quartzpvr-install.pl
 install/templates.txt
-install/quartzpvr-install.pl
 install/etc/quartzpvr/quartzpvr-server.conf
 install/etc/init.d/quartzpvr-server
 install/usr/sbin/quartzpvr.pl
