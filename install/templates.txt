@@ -1,0 +1,8 @@
+"$pvrdir/php/Config/Constants.inc",				"$pvrdir/php/Config/Constants.inc",				$web_uid, $web_gid,	0666
+"$pvrdir/php/Config/SqlConstants.inc",			"$pvrdir/php/Config/SqlConstants.inc",			$web_uid, $web_gid,	0600
+"install/etc/quartzpvr/quartzpvr-server.conf",	"/etc/quartzpvr/quartzpvr-server.conf",			$pvr_uid, $pvr_gid,	0600
+"install/etc/init.d/quartzpvr-server",			"/etc/init.d/quartzpvr-server",					$pvr_uid, $pvr_gid,	0755
+"install/usr/sbin/quartzpvr.pl",				"/usr/sbin/quartzpvr",							0,        0,	    0755
+
+"$perl_lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/SqlConstants.pm",	"$perl_lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/SqlConstants.pm",	$pvr_uid, $pvr_gid,	0600
+"$perl_lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/PHP/Install.pm",	"$perl_lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/PHP/Install.pm",	$pvr_uid, $pvr_gid,	0555

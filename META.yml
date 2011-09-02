@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Linux-DVB-DVBT-Apps-QuartzPVR
-version:            0.01
+version:            0.02
 abstract:           PVR Application 
 author:
     - Steve Price <cpan@quartz-net.co.uk>
@@ -11,14 +11,14 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    0.03:                 App::Framework
-    1.04:                 Config::Crontab
-    2.1:                  Linux::DVB::DVBT::Advert
+    App::Framework:       Config::Crontab
     Data::Dumper:         Linux::DVB::DVBT
-    Date::Manip:          ~
+    Date::Manip:          MP3::Tag
+    DBI:                  DBD::mysql
     File::Basename:       0
     File::Path:           0
     File::Spec:           0
+    Linux::DVB::DVBT::TS:  Linux::DVB::DVBT::Advert
     Pod::Coverage:        0.18
     POSIX:                0
     Test::Pod:            1.22

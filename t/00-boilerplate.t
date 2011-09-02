@@ -45,5 +45,5 @@ sub module_boilerplate_ok {
     "placeholder date/time"       => qr(Date/time)
   );
 
-  module_boilerplate_ok('lib/Linux/DVB/DVBT/TS.pm');
+  module_boilerplate_ok('lib/Linux/DVB/DVBT/Apps/QuartzPVR.pm');
 

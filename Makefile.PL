@@ -22,18 +22,18 @@ use Data::Dumper ;
 	## Options
 	get_makeopts() ;
 
-	## Check for current settings
-##	get_config() ;
-	
-	
+	## Programs to install
+	add_install_progs("scripts/", [
+		qw/dvbt-chans-sql dvbt-epg-sql dvbt-iplay dvbt-multirecord dvbt-record-mgr/
+	]);
+
+
 	## get distribution
 	my $dist = distribution_info() ;
 
-
-	
 	## get webserver info
 	my ($webuser, $webgroup, $webroot) = webserver_info($dist) ;
-print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" ;	
+print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" if $makeutils::DEBUG ;	
 	my %settings = (
 	
 		'WEB_USER'		=> $webuser,
@@ -49,19 +49,10 @@ print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" ;
 	get_settings(\%settings) ;
 	
 #print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" ;	
-print Data::Dumper->Dump(["Settings", \%settings]) ;
-
+#print Data::Dumper->Dump(["Settings", \%settings]) ;
 
 	## Update install
-	update_install_script($install_script, \%settings) ;
-	
-
-	## Programs to install
-#	add_install_progs("script/", [
-#		qw/dvbt-ts-repair dvbt-ts-pics dvbt-ts-cut dvbt-ts-info/
-#	]);
-
-	
+	update_install_script("install/tpl/quartzpvr-install.pl", $install_script, \%settings) ;
 
 	## Do any cleanup
 	process_makeopts() ;
@@ -82,12 +73,18 @@ print Data::Dumper->Dump(["Settings", \%settings]) ;
 			'Test::Pod' => 1.22,
 			'Data::Dumper',
 			
-			'Linux::DVB::DVBT' => 2.10,
-			'Linux::DVB::DVBT::Advert' => 0.03,
-			'App::Framework' => 1.04,
+			'Linux::DVB::DVBT',
+			'Linux::DVB::DVBT::TS',
+			'Linux::DVB::DVBT::Advert',
+			'App::Framework',
 			
 			'Config::Crontab',
 			'Date::Manip',
+			
+			'MP3::Tag',
+			'DBI',
+			'DBD::mysql',
+			
 			
 	    }, # e.g., Module::Name => 1.1
 	    ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
@@ -95,8 +92,7 @@ print Data::Dumper->Dump(["Settings", \%settings]) ;
 	       AUTHOR         => 'Steve Price <cpan@quartz-net.co.uk>') : ()),
 	    LIBS              => [], # e.g., '-lm'
 	    INC               => $modinfo_href->{'includes'},
-#	    EXE_FILES         => $modinfo_href->{'programs'},
-	 
+	    EXE_FILES         => $modinfo_href->{'programs'},
 	);
 
 
@@ -104,11 +100,22 @@ print Data::Dumper->Dump(["Settings", \%settings]) ;
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-sub MY::installbin 
+sub MY::force
 {
 "
-pure_install :: 
-	$^X $install_script
+# Phony target to force checking subdirectories.
+FORCE :
+	\$(NOECHO) \$(NOOP)
+
+## Call to QuartzPVR installation script
+pure_site_install :: 
+	$^X $install_script -perl_lib \$(DESTINSTALLSITELIB)
+
+pure_perl_install :: 
+	$^X $install_script -perl_lib \$(DESTINSTALLPRIVLIB)
+
+pure_vendor_install :: 
+	$^X $install_script -perl_lib \$(DESTINSTALLVENDORLIB)
 
 " ;
 }
@@ -143,16 +150,16 @@ cpandoc: FORCE
 #
 sub distribution_info
 {
-print "distribution_info\n" ;		
+#print "distribution_info\n" ;		
 	my $dist ;
 	my $reldir = '/etc' ;
 	foreach my $rel (glob("$reldir/*-release"))
 	{
-print "Dist dir: $rel\n" ;		
+#print "Dist dir: $rel\n" ;		
 		if ($rel =~ m%^$reldir/(\w+)\-release%)
 		{
 			my $this_dist = $1 ;
-print " + dist file $this_dist\n" ;		
+#print " + dist file $this_dist\n" ;		
 			if ($this_dist eq 'lsb')
 			{
 			    if (open my $fh, "<$rel")
@@ -164,7 +171,7 @@ print " + dist file $this_dist\n" ;
 				        if ($info =~ m/DISTRIB_ID\s*=\s*(.*)/)
 				        {
 				        	$dist = lc $1 ;
-print " + + dist = $dist\n" ;		
+#print " + + dist = $dist\n" ;		
 				        	last ;
 				        }
 				    }
@@ -186,22 +193,22 @@ print " + + dist = $dist\n" ;
 sub webserver_info
 {
 	my ($dist) = @_ ;
-print "web_info($dist)\n" ;		
+#print "web_info($dist)\n" ;		
 	
 	## user
 	my ($webuser, $webgroup) ;
 	foreach my $server (qw/apache http/)
 	{ 
-print " + server $server\n" ;		
+#print " + server $server\n" ;		
 		my @results = `ps -ef | grep -i $server | grep -v grep` ;
 		foreach my $line (@results)
 		{
 			chomp $line ;
-print " + + $line\n" ;		
+#print " + + $line\n" ;		
 			if ($line =~ /^(\S+)\s+/)
 			{
 				my $user = $1 ;
-print " + + + user=$user\n" ;		
+#print " + + + user=$user\n" ;		
 				if ($user ne 'root')
 				{
 					## Check valid user and get group if so
@@ -219,7 +226,7 @@ print " + + + user=$user\n" ;
 							$webuser = $user ;
 							$webgroup = $grp ;
 
-print " + + + webuser=$webuser webgroup=$webgroup\n" ;
+#print " + + + webuser=$webuser webgroup=$webgroup\n" ;
 
 							last ;
 						}
@@ -253,6 +260,7 @@ sub get_settings
 	my @settings = (
 [ "SQL_ROOT_PASSWORD",	undef,								"MySQL root user password so I can create the pvr database"],
 [ "DVBT_FREQFILE",		undef,								"full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)"],
+[ "MAIL_TO", 			$ENV{'user'} || "", 				"email account to mail PVR errors to"],
 [ "SERVER_PORT", 		"21328",							"TCP port of the new PVR server that I will install"],
 [ "WEB_USER", 			$settings_href->{'WEB_USER'},		"user name of the web server"],
 [ "WEB_GROUP", 			$settings_href->{'WEB_GROUP'},		"group name of the web server"],
@@ -271,7 +279,7 @@ sub get_settings
 	$settings_href->{'PERL_BIN'} = $^X ;
 	$settings_href->{'DATE_TZ'} = "TZ=GMT" ;
 	
-print Data::Dumper->Dump(["Settings", \%settings]) ;	
+#print Data::Dumper->Dump(["Settings", \%settings]) ;	
 	
 	 
 	## get any new settings
@@ -308,16 +316,13 @@ print Data::Dumper->Dump(["Settings", \%settings]) ;
 #----------------------------------------------------------------------
 sub update_install_script
 {
-	my ($install_script, $settings_href) = @_ ;
-
-	## Protect file
-	chmod 0700, $install_script ;
+	my ($tpl_install_script, $install_script, $settings_href) = @_ ;
 
 	## Read in file
 	my @lines ;
 	{
 	    local( $/ ) ;
-    	open( my $fh, $install_script ) or die "Error: reading install script file $install_script : $!" ;
+    	open( my $fh, $tpl_install_script ) or die "Error: reading install script file $tpl_install_script : $!" ;
 		my $lines = <$fh> ;
 		close $fh ;
 
@@ -350,6 +355,10 @@ sub update_install_script
 		print $fh "$_\n" ;
 	}
 	close $fh ;
+
+	## Protect file
+	chmod 0700, $install_script ;
+
 }
 
 
@@ -357,6 +366,8 @@ sub update_install_script
 sub read_install_script
 {
 	my ($install_script, $settings_href) = @_ ;
+
+	return if (! -f $install_script) ;
 
 	## Read in file
 	my @lines ;

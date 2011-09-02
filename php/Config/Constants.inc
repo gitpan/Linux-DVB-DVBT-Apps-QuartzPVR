@@ -7,44 +7,48 @@ define("CONFIG_VERSION", "4.000") ;
 #============================================================================================
 # PVR
 #============================================================================================
-define("PVR_USER", 		'sdprice1') ;
-define("PVR_GROUP", 	'users') ;
+define("PVR_USER", 		'%PVR_USER%') ;
+define("PVR_GROUP", 	'%PVR_GROUP%') ;
+define("PVR_LOGDIR", 	'%PVR_LOGDIR%') ;
+define("MAIL_TO", 		'%MAIL_TO%') ;
 
 
 #============================================================================================
 # MySQL
 #============================================================================================
 
-define("DATABASE", 		'tvguide') ;
+define("DATABASE", 		'%DATABASE%') ;
 
 #============================================================================================
 # Perl libs etc
 #============================================================================================
 
-define("SERVER_PORT", 	'2222') ;
+define("SERVER_PORT", 	'%SERVER_PORT%') ;
+
 
 # Directories
-define("VIDEO_DIR", 	'/served/videos/PVR') ;
-define("AUDIO_DIR", 	'/served/stories') ;
-define("PVR_LOGDIR", 	"/var/log/quartzpvr") ;
-define("PVR_HOME", 		"/var/lib/quartzpvr") ;
+define("VIDEO_DIR", 	'%VIDEO_DIR%') ;
+define("AUDIO_DIR", 	'%AUDIO_DIR%') ;
+define("PVR_LOGDIR", 	'%PVR_LOGDIR%') ;
+define("PVR_HOME", 		'/var/lib/%PVR_USER%') ;
 
 
 # Executables
-define("PVR_ROOT", "/home/sdprice1/svn/quartz-pvr-develop") ;
-$PERL_BIN = "/usr/bin/perl" ;
+define("PVR_ROOT", "%PVR_ROOT%") ;
+$PERL_BIN = "%PERL_BIN%" ;
 
 
 #============================================================================================
 # DATE/TIME
 #============================================================================================
+//$DATE_TZ = "%DATE_TZ%" ;
 $DATE_TZ = "Europe/London" ;
-
 
 #============================================================================================
 # DVB-T
 #============================================================================================
-define("DVBT_FREQFILE", "/usr/share/dvb/dvb-t/uk-Oxford") ;
+define("DVBT_FREQFILE", "%DVBT_FREQFILE%") ;
+
 
 
 
@@ -76,10 +80,10 @@ define("SQL_HOST", 		'localhost') ;
 
 define("TBL_LISTINGS", 	'listings') ;
 define("TBL_CHANNELS", 	'channels') ;
-define("TBL_RECORDING", 'record2') ;
-define("TBL_SCHEDULE", 	'schedule2') ;
-define("TBL_MULTIREC", 	'multirec2') ;
-define("TBL_IPLAY", 	'iplay2') ;
+define("TBL_RECORDING", 'record') ;
+define("TBL_SCHEDULE", 	'schedule') ;
+define("TBL_MULTIREC", 	'multirec') ;
+define("TBL_IPLAY", 	'iplay') ;
 define("TBL_RECORDED", 	'recorded') ;
 
 #============================================================================================
@@ -89,13 +93,12 @@ define("TBL_RECORDED", 	'recorded') ;
 # Perl
 define("SCRIPTS_DIR", "scripts") ;
 
-
 # Record manager
-/////$DVB_RECORD_MGR = " " . PVR_ROOT . "/" .  SCRIPTS_DIR . "/dvb_record_mgr.pl -php " ;
+##$DVB_RECORD_MGR = " " . PVR_ROOT . "/" .  SCRIPTS_DIR . "/dvb_record_mgr.pl -php " ;
 $DVB_RECORD_MGR = "dvb_record_mgr -php " ;
 
-define("RECPROG", "dvbt-multirecord.pl") ;
-define("IPLAYPROG", "dvbt-iplay.pl") ;
+define("RECPROG", "dvbt-multirecord") ;
+define("IPLAYPROG", "dvbt-iplay") ;
 
 #============================================================================================
 # Record management command lines

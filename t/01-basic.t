@@ -11,7 +11,7 @@ use Test::More tests => 1;
 ##### Linux::DVB::DVBT::Advert
 
 ## Check module loads ok
-BEGIN { use_ok('Linux::DVB::DVBT::TS') };
+BEGIN { use_ok('Linux::DVB::DVBT::Apps::QuartzPVR') };
 
 ### Check class method
 #Linux::DVB::DVBT->debug(10) ;

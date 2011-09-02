@@ -809,21 +809,3 @@ CREATE TABLE `schedule` (
 
 __DATA__ config
 
-AUDIO_DIR = /served/stories
-DATABASE = quartzpvr
-DATE_TZ = TZ=GMT
-DVBT_FREQFILE = /usr/share/dvb/dvb-t/uk-Oxford
-MAIL_TO = linux@quartz-net.co.uk
-PERL_BIN = /usr/bin/perl
-PVR_GROUP = video
-PVR_LOGDIR = /var/log/quartzpvr
-PVR_ROOT = /var/www/quartzpvr
-PVR_USER = quartzpvr
-SERVER_PORT = 21328
-SQL_PASSWORD = qp16902
-SQL_ROOT_PASSWORD = zzsqlroot
-SQL_USER = quartzpvr
-VIDEO_DIR = /served/videos/PVR
-WEB_GROUP = www-data
-WEB_ROOT = /var/www
-WEB_USER = www-data

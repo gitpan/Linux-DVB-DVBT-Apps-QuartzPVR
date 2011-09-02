@@ -1,11 +1,7 @@
-Linux-DVB-DVBT-TS
-=================
+Linux-DVB-DVBT-Apps-QuartzPVR
+=============================
 
-Linux::DVB::DVBT::TS is a package that provides a framework for parsing transport stream files.
-
-Example scripts have been provided in the package which illustrate the expected use of the package (and
-are useable programs in themeselves). For futher details please see 'perldoc Linux::DVB::DVBT::TS'.
-
+Linux::DVB::DVBT::Apps::QuartzPVR is a package that includes a web frontend EPG for scheduling DVB-T recordings.
 
 INSTALLATION
 
@@ -16,19 +12,104 @@ To install this module type the following:
    make test
    make install
 
+INSTALL QUESTIONS
+
+When you run 'perl Makefile.PL' a number of questions are asked to determine your setup. The answers are then 
+embedded into various config files in the installation.
+
+Questions asked are:
+
+* SQL_ROOT_PASSWORD - MySQL root user password so I can create the pvr database
+
+The root user password for your MySQL server. This allows the installation to create the new MySQL user
+and database used for the tv guide. 
+
+* DVBT_FREQFILE - full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)
+
+Give the path to the frequency file. This is used by dvbt-scan to initialise the tuner.
+
+* MAIL_TO - email account to mail PVR errors to
+
+Give a mail account (e.g. fred@bloggs) to which all script errors will be sent. This is useful for cases where a 
+program has failed to record. 
+
+* SERVER_PORT - TCP port of the new PVR server that I will install
+
+Specify a different TCP port number for the PVR server to use. The server provides the interface between the scheduling
+Perl script and the web frontend 
+
+* WEB_USER - user name of the web server
+
+User name that your web server uses (e.g. on Ubuntu this is www-data)
+
+* WEB_GROUP - group name of the web server
+
+Group name that your web server uses (e.g. on Ubuntu this is www-data)
+
+* SQL_USER - username of the MySQL pvr database owner
+
+Change the MySQL username that will be created for the tv guide database
+
+* SQL_PASSWORD - password of the MySQL pvr database owner
+
+Change the MySQL password that will be used for the tv guide database
+
+* PVR_USER - Linux user name created for recording
+
+Specify a username to use for running the recording scripts. By default a new system user will be created, but you can
+also specify an existing user. Note that recordings are added to that user's crontab
+
+* PVR_GROUP - Linux group name for PVR_USER
+
+Specify a group to use for running the recording scripts. By default uses 'video' to allow access to the DVB-T drivers.
+
+* PVR_LOGDIR - location of PVR logs
+
+A directory under which all PVR logs are stored
+
+* DATABASE - PVR database name
+
+The MySQL database name to use for the tv guide
+
+* VIDEO_DIR - Video recording top-level directory
+
+The directory under which all videos are recorded
+
+* AUDIO_DIR - Audio recording top-level directory
+
+The directory under which all audio files are recorded
+
+* PVR_ROOT - Installation directory. This is where all of the PVR software is installed.
+
+This is where the web frontend files (PHP, CSS, Javascript) are installed. You will need to add an entry to your 
+web server configuration to allow access to this directory (and it is up to you to protect site access).
+
+
+
 DEPENDENCIES
+
+To run the web frontend you need to have installed:
+
+	web server (preferably apache)
+	php
+	MySql
+	a dvb package (to provide the initial frequency file)
 
 This module requires these other modules and libraries:
 
-use File::Basename ;
-use File::Path ;
-use File::Spec ;
+	use App::Framework ;
+	use Linux::DVB::DVBT ;
+	use Linux::DVB::DVBT::TS ;
+	use Linux::DVB::DVBT::Advert ;
+	use MP3::Tag ;
+	use DBI ;
+	use DBD::mysql ;
 
 
-DEBUG
+OPTIONAL
 
-If you have any problems, particularly with scanning, please re-run with debug set to 15 and send me the
-log file (see my CPAN email). I'll try to fix the problem as soon as possible.
+If you have access to the BBC iplayer, you can schedule iplayer file downloads via the EPG. To do this you need
+to install get_iplayer from http://www.infradead.org/get_iplayer/html/get_iplayer.html
 
 
 COPYRIGHT AND LICENCE
@@ -39,43 +120,26 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
 at your option, any later version of Perl 5 you may have available.
 
-This module uses libmpeg2 for MPEG2 video decoding:
+The web interface uses jQuery:
 
- * Copyright (C) 2000-2003 Michel Lespinasse <walken@zoy.org>
- * Copyright (C) 1999-2000 Aaron Holtzman <aholtzma@ess.engr.uvic.ca>
- *
- * See http://libmpeg2.sourceforge.net/ for updates.
- *
- * libmpeg2 is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * libmpeg2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-This module uses mpegaudiodec for AAC audio decoding:
-
- * MPEG Audio decoder
- * Copyright (c) 2001, 2002 Fabrice Bellard.
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+	Copyright (c) 2009 John Resig, http://jquery.com/
+	
+	Permission is hereby granted, free of charge, to any person obtaining
+	a copy of this software and associated documentation files (the
+	"Software"), to deal in the Software without restriction, including
+	without limitation the rights to use, copy, modify, merge, publish,
+	distribute, sublicense, and/or sell copies of the Software, and to
+	permit persons to whom the Software is furnished to do so, subject to
+	the following conditions:
+	
+	The above copyright notice and this permission notice shall be
+	included in all copies or substantial portions of the Software.
+	
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+	EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+	NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+	LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+	OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+	WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 

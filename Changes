@@ -1,5 +1,8 @@
 Revision history for Perl extension Linux::DVB::DVBT::App::QuartzPVR.
 
+0.01  Frid Sep 02 12:59:56 2011
+	- fixed nasty namespace fouling
+		
 0.01  Thu Aug 25 15:59:56 2011
 	- original version
 		

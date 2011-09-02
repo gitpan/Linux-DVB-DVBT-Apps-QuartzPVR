@@ -6,7 +6,7 @@ use Test::More tests => 1;
 my $mod ;
 
 BEGIN {
-	$mod = 'Linux::DVB::DVBT::TS' ;
+	$mod = 'Linux::DVB::DVBT::Apps::QuartzPVR' ;
 	use_ok( "$mod" );
 }
 

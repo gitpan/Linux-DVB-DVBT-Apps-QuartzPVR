@@ -6,7 +6,7 @@ use base qw(Net::Server::Fork);
 
 	my %COMMANDS = (
 	
-		'dvb_record_mgr'		=> $^X . ' %PVR_ROOT%/scripts/dvb_record_mgr.pl',
+		'dvb_record_mgr'		=> 'dvbt-record-mgr',
 		
 	) ;
 
