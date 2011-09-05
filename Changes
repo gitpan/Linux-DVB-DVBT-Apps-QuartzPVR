@@ -1,5 +1,11 @@
-Revision history for Perl extension Linux::DVB::DVBT::App::QuartzPVR.
+Revision history for Perl module Linux::DVB::DVBT::App::QuartzPVR.
 
+0.04  Sat Sep 03 17:17:56 2011
+	- fixed prerequisites bug
+	- included required PEAR php modules
+	- fixed init.d script
+	- corrected install script (user add section)
+		
 0.03  Fri Sep 02 19:17:56 2011
 	- fixed MANIFEST bug
 		

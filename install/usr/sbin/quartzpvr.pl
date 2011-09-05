@@ -94,12 +94,8 @@ use base qw(Net::Server::Fork);
 	#
 
     my $server = Linux::DVB::DVBT::Apps::QuartzPVR->new({
-#        port 		=> ['%SERVER_PORT%'],
-#		user 		=> '%PVR_USER%',
-#		group 		=> '%PVR_GROUP%',
-#        log_file 	=> '/var/log/quartzpvr-server.log',
-
-		conf_file => '/etc/quartzpvr/quartzpvr-server.conf',
+		conf_file 	=> '/etc/quartzpvr/quartzpvr-server.conf',
+		pid_file	=> '/var/run/quartzpvr/server.pid',
     });
 
     $server->run() ;

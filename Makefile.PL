@@ -71,19 +71,20 @@ print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" if $makeutils::DEBUG 
 			'Test::Pod::Coverage'	=> 1.08,
 			'Pod::Coverage' => 0.18,
 			'Test::Pod' => 1.22,
-			'Data::Dumper',
+			'Data::Dumper' => 0,
 			
-			'Linux::DVB::DVBT',
-			'Linux::DVB::DVBT::TS',
-			'Linux::DVB::DVBT::Advert',
-			'App::Framework',
+			'Linux::DVB::DVBT' => 0,
+			'Linux::DVB::DVBT::TS' => 0,
+			'Linux::DVB::DVBT::Advert' => 0,
+			'App::Framework' => 0,
 			
-			'Config::Crontab',
-			'Date::Manip',
+			'Config::Crontab' => 0,
+			'Date::Manip' => 0,
 			
-			'MP3::Tag',
-			'DBI',
-			'DBD::mysql',
+			'MP3::Tag' => 0,
+			'DBI' => 0,
+			'DBD::mysql' => 0,
+			'Net::Server::Fork' => 0,
 			
 			
 	    }, # e.g., Module::Name => 1.1
@@ -278,6 +279,7 @@ sub get_settings
 	
 	$settings_href->{'PERL_BIN'} = $^X ;
 	$settings_href->{'DATE_TZ'} = "TZ=GMT" ;
+	$settings_href->{'PVR_HOME'} = "/var/lib/$settings_href->{'PVR_USER'}" ;
 	
 #print Data::Dumper->Dump(["Settings", \%settings]) ;	
 	

@@ -10,7 +10,7 @@ use Linux::DVB::DVBT ;
 
 
 # VERSION
-our $VERSION = '1.00' ;
+our $VERSION = '1.01' ;
 our $DEBUG = 0 ;
 
 	# Create application and run it
@@ -102,18 +102,37 @@ sub create_pvr_user
 	my $home = $settings_href->{'PVR_HOME'} ;
 	
 	my $uid = getpwnam($user) ; 
-	my $gid = getgrnam($group) ;
+	my ($name,$passwd,$gid,$members) = getgrnam($group) ;
 	
 	## Create group if required
 	if (!$gid)
 	{
-		`groupadd $group` ;
+#		$app->run("groupadd $group") ;
+		runit($app,
+			"groupadd $group",
+			"Creating group $group",
+		) ;
 	}
 	
 	## Create user if required
+	my $system_user = 0 ;
 	if (!$uid)
 	{
-		`useradd -r -d $home -m -k /dev/null -g $group $user` ;
+#		$app->run("useradd -c 'Quartz PVR' -r -d $home -m -k /dev/null -g $group $user") ;
+		runit($app,
+			"useradd -c 'Quartz PVR' -r -d $home -m -k /dev/null -g $group $user",
+			"Creating user $user",
+		) ;
+		$system_user=1 ;
+	}
+	
+	## Add user to group if required
+	if (($members !~ /\b$user\b/) && !$system_user)
+	{
+		runit($app,
+			"usermod -a -G $group $user",
+			"Adding user $user to group $group",
+		) ;
 	}
 	
 	## Ensure crontab is initialised
@@ -180,18 +199,23 @@ SELECT user from mysql.user where user='$settings_href->{SQL_USER}';
 SQL
 	close $fh ;
 
-	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0") ;
-	my $results_aref = $app->run()->results ;
-	my $status = $app->run()->status ;
-	if ($status)
-	{
-		print "Error: MySQL error while loading $temp0\n" ;
-		foreach (@$results_aref)
-		{
-			print "$_\n" ;
-		}
-		exit 1 ;
-	}
+	my $results_aref = runit($app,
+		"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0",
+		"MySQL error while checking for user"
+	) ;
+
+#	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0") ;
+#	my $results_aref = $app->run()->results ;
+#	my $status = $app->run()->status ;
+#	if ($status)
+#	{
+#		print "Error: MySQL error while loading $temp0\n" ;
+#		foreach (@$results_aref)
+#		{
+#			print "$_\n" ;
+#		}
+#		exit 1 ;
+#	}
 	
 	my $create_user = 1 ;
 	if (@$results_aref)
@@ -231,18 +255,23 @@ SQL
 	}
 	close $fh ;
 
-	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp1") ;
-	$status = $app->run()->status ;
-	if ($status)
-	{
-		print "Error: MySQL error while loading $temp1\n" ;
-		$results_aref = $app->run()->results ;
-		foreach (@$results_aref)
-		{
-			print "$_\n" ;
-		}
-		exit 1 ;
-	}
+	runit($app,
+		"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp1",
+		"MySQL error while creating database"
+	) ;
+
+#	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp1") ;
+#	$status = $app->run()->status ;
+#	if ($status)
+#	{
+#		print "Error: MySQL error while loading $temp1\n" ;
+#		$results_aref = $app->run()->results ;
+#		foreach (@$results_aref)
+#		{
+#			print "$_\n" ;
+#		}
+#		exit 1 ;
+#	}
 	
 	
 	## Check for listings
@@ -286,26 +315,32 @@ SQL
 		print $fh $sql ;
 		close $fh ;
 	
-		$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp2") ;
-		$status = $app->run()->status ;
-		if ($status)
-		{
-			print "Error: MySQL error while loading $temp2\n" ;
-			$results_aref = $app->run()->results ;
-			foreach (@$results_aref)
-			{
-				print "$_\n" ;
-			}
-			exit 1 ;
-		}
+
+		runit($app,
+			"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp2",
+			"MySQL error while creating tables"
+		) ;
+
+#		$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp2") ;
+#		$status = $app->run()->status ;
+#		if ($status)
+#		{
+#			print "Error: MySQL error while loading $temp2\n" ;
+#			$results_aref = $app->run()->results ;
+#			foreach (@$results_aref)
+#			{
+#				print "$_\n" ;
+#			}
+#			exit 1 ;
+#		}
 	}
 	
 	unless ($DEBUG)
 	{
-	unlink $temp0 ;
-	unlink $temp1 ;
-	unlink $temp2 if $temp2 ;
-	unlink $temp3 ;
+		unlink $temp0 ;
+		unlink $temp1 ;
+		unlink $temp2 if $temp2 ;
+		unlink $temp3 ;
 	}
 }
 
@@ -335,7 +370,7 @@ sub create_dirs
 	}
 	
 	## PVR
-	foreach my $d (qw/VIDEO_DIR AUDIO_DIR PVR_LOGDIR/)
+	foreach my $d (qw/VIDEO_DIR AUDIO_DIR PVR_LOGDIR PVR_HOME/)
 	{
 		if (! -d $settings_href->{$d})
 		{
@@ -344,7 +379,14 @@ sub create_dirs
 			chown $pvr_uid, $pvr_gid, $settings_href->{$d} ;
 		}
 	}
-	
+
+	# pvr server
+	foreach my $d (qw%/var/run/quartzpvr%)
+	{
+		mkdir $d ;
+		chmod 0755, $d ;
+		chown $pvr_uid, $pvr_gid, $d ;
+	}
 }
 
 #----------------------------------------------------------------------
@@ -364,27 +406,41 @@ sub install_files
 		
 		## copy directory
 		print " * Installing files from $dir .. " ;
-		$app->run("cp -pr $dir $dest") ;
+		runit($app,
+			"cp -pr $dir $dest",
+			"copying files from $dir"
+		) ;
 		print "done\n" ;
-		my $status = $app->run()->status ;
-		if ($status)
-		{
-			print "Error copying files from $dir\n" ;
-			exit 1 ;
-		}
+		
+#		$app->run("cp -pr $dir $dest") ;
+#		print "done\n" ;
+#		my $status = $app->run()->status ;
+#		if ($status)
+#		{
+#			print "Error copying files from $dir\n" ;
+#			exit 1 ;
+#		}
 		
 		## Set ownership
-		$app->run("chown -R $owner $dest/$dir") ;
-		$status = $app->run()->status ;
-		if ($status)
-		{
-			print "Error setting ownership of $dest/$dir to $owner\n" ;
-			exit 1 ;
-		}
+		runit($app,
+			"chown -R $owner $dest/$dir",
+			"setting ownership of $dest/$dir to $owner"
+		) ;
+
+#		$app->run("chown -R $owner $dest/$dir") ;
+#		$status = $app->run()->status ;
+#		if ($status)
+#		{
+#			print "Error setting ownership of $dest/$dir to $owner\n" ;
+#			exit 1 ;
+#		}
 	}
 	
 	## Copy index file 
-	$app->run("cp index.php $dest") ;
+	runit($app,
+		"cp index.php $dest",
+		"copying index.php to $dest"
+	) ;
 	
 
 }
@@ -533,7 +589,11 @@ sub dvbt_channels
 	my ($app, $settings_href) = @_ ;
 
 	print "Updating DVB-T channels ..\n" ;
-	$app->run("dvbt-chans-sql ")
+#	$app->run("dvbt-chans-sql ")
+	runit($app,
+		"dvbt-chans-sql",
+		"failed to set up channels table"
+	) ;
 	
 }
 
@@ -551,18 +611,22 @@ SELECT * from $settings_href->{DATABASE}.listings LIMIT 1 ;
 SQL
 	close $fh ;
 
-	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0") ;
-	my $results_aref = $app->run()->results ;
-	my $status = $app->run()->status ;
-	if ($status)
-	{
-		print "Error: MySQL error while loading $temp0\n" ;
-		foreach (@$results_aref)
-		{
-			print "$_\n" ;
-		}
-		exit 1 ;
-	}
+	my $results_aref = runit($app,
+		"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0",
+		"MySQL error while checking for listings"
+	) ;
+#	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0") ;
+#	my $results_aref = $app->run()->results ;
+#	my $status = $app->run()->status ;
+#	if ($status)
+#	{
+#		print "Error: MySQL error while loading $temp0\n" ;
+#		foreach (@$results_aref)
+#		{
+#			print "$_\n" ;
+#		}
+#		exit 1 ;
+#	}
 	
 	my $got_listings = 0 ;
 	if (@$results_aref)
@@ -576,7 +640,7 @@ SQL
 	}
 	else
 	{
-		print "Gathering DVB-T listings (please wait) ..\n" ;
+		print "Gathering DVB-T listings (please wait, this can take 30 minutes or so) ..\n" ;
 		system("dvbt-epg-sql") ;
 	}
 
@@ -607,6 +671,47 @@ sub get_config
 		}
 	}
 	return %settings ;
+}
+
+
+#----------------------------------------------------------------------
+# run command
+#
+sub runit
+{
+	my ($app, $cmd, $errmsg) = @_ ;
+
+print STDERR "Run cmd: $cmd\n" if $DEBUG ;
+
+	$app->run($cmd) ;
+	my $results_aref = $app->run()->results ;
+	my $status = $app->run()->status ;
+
+if ($DEBUG)
+{
+	print STDERR "Status: $status\n" ;
+	if ($status)
+	{
+		print STDERR "Output:\n" ;
+		foreach (@$results_aref)
+		{
+			print STDERR " * $_\n" ;
+		}
+	}	
+}
+
+
+	if ($status)
+	{
+		print "Error: $errmsg\n" ;
+		foreach (@$results_aref)
+		{
+			print STDERR "$_\n" ;
+		}
+		exit 1 ;
+	}
+	
+	return $results_aref ;
 }
 
 

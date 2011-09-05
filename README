@@ -85,6 +85,12 @@ This is where the web frontend files (PHP, CSS, Javascript) are installed. You w
 web server configuration to allow access to this directory (and it is up to you to protect site access).
 
 
+UBUNTU
+
+If you haven't already got DBD::mysql, then you may need to install libmysqlclient-dev package for the cpan install
+to work properly (it needs mysql_config). Run:
+
+	sudo apt-get install libmysqlclient-dev
 
 DEPENDENCIES
 
@@ -104,6 +110,7 @@ This module requires these other modules and libraries:
 	use MP3::Tag ;
 	use DBI ;
 	use DBD::mysql ;
+	use Net::Server::Fork ;
 
 
 OPTIONAL
