@@ -101,13 +101,17 @@ sub create_pvr_user
 	my $group = $settings_href->{'PVR_GROUP'} ;
 	my $home = $settings_href->{'PVR_HOME'} ;
 	
-	my $uid = getpwnam($user) ; 
-	my ($name,$passwd,$gid,$members) = getgrnam($group) ;
+#	my $uid = getpwnam($user) ; 
+	my ($uname, $upasswd, $uid, $ugid, $quota,
+		$comment, $gcos, $dir, $shell) = getpwnam($user) ; 
+	my ($gname,$gpasswd,$gid,$members) = getgrnam($group) ;
+	
+print "user=$user : uid=$uid name=$uname gid=$ugid dir=$dir\n" if $DEBUG ;
+print "group=$group : name=$gname gid=$gid members='$members'\n" if $DEBUG ;
 	
 	## Create group if required
 	if (!$gid)
 	{
-#		$app->run("groupadd $group") ;
 		runit($app,
 			"groupadd $group",
 			"Creating group $group",
@@ -118,21 +122,35 @@ sub create_pvr_user
 	my $system_user = 0 ;
 	if (!$uid)
 	{
-#		$app->run("useradd -c 'Quartz PVR' -r -d $home -m -k /dev/null -g $group $user") ;
 		runit($app,
 			"useradd -c 'Quartz PVR' -r -d $home -m -k /dev/null -g $group $user",
 			"Creating user $user",
 		) ;
 		$system_user=1 ;
 	}
+
+	($uname, $upasswd, $uid, $ugid, $quota,
+		$comment, $gcos, $dir, $shell) = getpwnam($user) ; 
+	($gname,$gpasswd,$gid,$members) = getgrnam($group) ;
+	
+print "NOW user=$user : uid=$uid name=$uname gid=$ugid dir=$dir\n" if $DEBUG ;
+print "NOW group=$group : name=$gname gid=$gid members='$members'\n" if $DEBUG ;
 	
 	## Add user to group if required
-	if (($members !~ /\b$user\b/) && !$system_user)
+	# check user's primary group id matches group id
+	# OR user is in the members list of the group
+	if ( ($ugid != $gid) && ($members !~ /\b$user\b/) )
 	{
-		runit($app,
-			"usermod -a -G $group $user",
-			"Adding user $user to group $group",
+		my $stat = try_runit($app,
+			"usermod -a -G $group $user"
 		) ;
+		if ($stat)
+		{
+			runit($app,
+				"usermod -A -G $group $user",
+				"Adding user $user to group $group",
+			) ;
+		}
 	}
 	
 	## Ensure crontab is initialised
@@ -563,7 +581,6 @@ sub dvbt_scan
 	}
 	else
 	{
-	
 		my $tuning_href = $dvb->get_tuning_info() ;
 	#Linux::DVB::DVBT::prt_data("Current tuning info=", $tuning_href) ;
 		$dvb = undef ;
@@ -681,9 +698,34 @@ sub runit
 {
 	my ($app, $cmd, $errmsg) = @_ ;
 
+	my ($results_aref, $status) = try_runit($app, $cmd) ;
+	
+	if ($status)
+	{
+		print "Error: $errmsg\n" ;
+		foreach (@$results_aref)
+		{
+			print STDERR "$_\n" ;
+		}
+		exit 1 ;
+	}
+	
+	return $results_aref ;
+}
+
+#----------------------------------------------------------------------
+# run command
+#
+sub try_runit
+{
+	my ($app, $cmd) = @_ ;
+
 print STDERR "Run cmd: $cmd\n" if $DEBUG ;
 
-	$app->run($cmd) ;
+	$app->run(
+		'cmd'		=> $cmd,
+		'on_error'	=> 'status',
+	) ;
 	my $results_aref = $app->run()->results ;
 	my $status = $app->run()->status ;
 
@@ -700,18 +742,7 @@ if ($DEBUG)
 	}	
 }
 
-
-	if ($status)
-	{
-		print "Error: $errmsg\n" ;
-		foreach (@$results_aref)
-		{
-			print STDERR "$_\n" ;
-		}
-		exit 1 ;
-	}
-	
-	return $results_aref ;
+	return wantarray ? ($results_aref, $status) : $status ;
 }
 
 

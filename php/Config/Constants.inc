@@ -10,6 +10,7 @@ define("CONFIG_VERSION", "4.000") ;
 define("PVR_USER", 		'%PVR_USER%') ;
 define("PVR_GROUP", 	'%PVR_GROUP%') ;
 define("PVR_LOGDIR", 	'%PVR_LOGDIR%') ;
+
 define("MAIL_TO", 		'%MAIL_TO%') ;
 
 
@@ -23,19 +24,12 @@ define("DATABASE", 		'%DATABASE%') ;
 # Perl libs etc
 #============================================================================================
 
-define("SERVER_PORT", 	'%SERVER_PORT%') ;
-
 
 # Directories
 define("VIDEO_DIR", 	'%VIDEO_DIR%') ;
 define("AUDIO_DIR", 	'%AUDIO_DIR%') ;
-define("PVR_LOGDIR", 	'%PVR_LOGDIR%') ;
-define("PVR_HOME", 		'/var/lib/%PVR_USER%') ;
+define("PVR_ROOT", 		"%PVR_ROOT%") ;
 
-
-# Executables
-define("PVR_ROOT", "%PVR_ROOT%") ;
-$PERL_BIN = "%PERL_BIN%" ;
 
 
 #============================================================================================
@@ -57,6 +51,15 @@ define("DVBT_FREQFILE", "%DVBT_FREQFILE%") ;
 #############################################################################################
 # FIXED - DO NOT CHANGE
 #############################################################################################
+
+define("PVR_HOME", 		'/var/lib/%PVR_USER%') ;
+
+define("SERVER_PORT", 	'%SERVER_PORT%') ;
+
+
+# Executables
+$PERL_BIN = "%PERL_BIN%" ;
+
 
 #============================================================================================
 # DIRS

@@ -259,9 +259,9 @@ sub get_settings
 	my ($settings_href) = @_ ;
 	
 	my @settings = (
-[ "SQL_ROOT_PASSWORD",	undef,								"MySQL root user password so I can create the pvr database"],
-[ "DVBT_FREQFILE",		undef,								"full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)"],
-[ "MAIL_TO", 			$ENV{'user'} || "", 				"email account to mail PVR errors to"],
+[ "SQL_ROOT_PASSWORD",	"e.g. password",							"MySQL root user password so I can create the pvr database"],
+[ "DVBT_FREQFILE",		"e.g. /usr/share/dvb/dvb-t/uk-Oxford",		"full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)"],
+[ "MAIL_TO", 			$ENV{'user'} || 'e.g. root@somewhere',		"email account to mail PVR errors to"],
 [ "SERVER_PORT", 		"21328",							"TCP port of the new PVR server that I will install"],
 [ "WEB_USER", 			$settings_href->{'WEB_USER'},		"user name of the web server"],
 [ "WEB_GROUP", 			$settings_href->{'WEB_GROUP'},		"group name of the web server"],

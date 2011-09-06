@@ -44,7 +44,7 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::Mail ;
 #============================================================================================
 # GLOBALS
 #============================================================================================
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 
 #============================================================================================
@@ -237,7 +237,7 @@ sub new
 	my $num_adapters = $args{'num_adapters'} || $total_num_adapters ;
 	$num_adapters = $total_num_adapters if ($num_adapters > $total_num_adapters) ;
 	
-	die "ERror: You must have at least one DVB-T adapter available for recording" unless $num_adapters ;
+#	die "Error: You must have at least one DVB-T adapter available for recording" unless $num_adapters ;
 	
 	$this->set(
 		'devices'		=> \@devices,
@@ -345,6 +345,8 @@ sub process
 	my $this = shift ;
 	my ($opts_href) = @_ ;
 	
+	my $num_adapters = $this->num_adapters ;
+	
 	if ($opts_href->{'info'})
 	{
 		## Display settings
@@ -352,11 +354,17 @@ sub process
 	}
 	elsif ($opts_href->{'rec'})
 	{
+		die "Error: You must have at least one DVB-T adapter available for recording" unless $num_adapters ;
+	
+		
 		## Handle new/changed recording 
 		$this->modify_recording($opts_href->{'rec'}) ;
 	}
 	else
 	{
+		die "Error: You must have at least one DVB-T adapter available for recording" unless $num_adapters ;
+	
+		
 		## Do the update
 		$this->update() ;
 	}

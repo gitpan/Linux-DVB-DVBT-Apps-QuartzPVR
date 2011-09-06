@@ -162,6 +162,19 @@ TitleBar.display_head = function(titleText, titleHint, titleCallback, currTool)
 				this.addTool("chansel", "Displayed Channels", TitleBar.settings.app.create_handler(TitleBar.settings.app.showChanSel, "")) ;
 			}
 			
+			
+			// Finish with help
+			$("<a>")
+				.attr(
+					'href', "php/doc/index.html",
+					'title', "HELP!"
+						)
+				.appendTo( $(this.toolDiv) )
+				.append(
+					$("<img>")
+						.attr("src", this.settings.app.getImage("help"))
+				) ;
+			
 	
 	// Replace previous display with the new one
 	headDiv.replaceChild(gridhd, prev_gridhd) ;

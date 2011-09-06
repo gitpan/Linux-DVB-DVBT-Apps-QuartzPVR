@@ -9,3 +9,5 @@
 
 "blib/lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/SqlConstants.pm",	"blib/lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/SqlConstants.pm",	$pvr_uid, $pvr_gid,	0600
 "blib/lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/PHP/Install.pm",		"blib/lib/Linux/DVB/DVBT/Apps/QuartzPVR/Config/PHP/Install.pm",	$pvr_uid, $pvr_gid,	0555
+
+"$pvrdir/php/doc/config.html",					"$pvrdir/php/doc/config.html",					$web_uid, $web_gid,	0755

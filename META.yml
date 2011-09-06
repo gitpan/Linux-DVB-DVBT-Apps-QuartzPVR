@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Linux-DVB-DVBT-Apps-QuartzPVR
-version:            0.04
+version:            0.05
 abstract:           PVR Application 
 author:
     - Steve Price <cpan@quartz-net.co.uk>
