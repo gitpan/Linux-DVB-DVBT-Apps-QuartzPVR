@@ -251,7 +251,7 @@ sub report_prog_entry
 		."] " ;
 	if (defined($prog_href->{'adapter'}))
 	{
-		$text .= sprintf ": DVB%d", $prog_href->{'adapter'} ;
+		$text .= ": DVB$prog_href->{'adapter'}" ;
 	}
 	$text .= ": Priority $prog_href->{priority} " ;
 	$text .= ": PID $prog_href->{pid} " ;
@@ -414,7 +414,7 @@ sub scheduling_dvb_lines
 	{
 #print "\nscheduling_dvb_lines(DVB $adap)\n" ;
 		
-		$schedule_dvb_lines .= sprintf("==[ DVB%d ]==\n\n", $adap) ;
+		$schedule_dvb_lines .= "==[ DVB$adap ]==\n\n" ;
 		my @lines = $this->report_prog_list($sched{$adap}) ;
 		$schedule_dvb_lines .= "    " . join "\n    ", @lines ;
 		$schedule_dvb_lines .= "\n\n" ;
@@ -463,7 +463,7 @@ RECSPECLINES
 	## devices
 	foreach my $dev_href (@{$report_href->{'devices'}})
 	{
-		$devices_lines .= sprintf "DVB%d : $dev_href->{'name'} [ $dev_href->{'device'} ]\n", $dev_href->{'adapter_num'} ;
+		$devices_lines .= "DVB$dev_href->{'adapter_num'}:$dev_href->{'frontend_num'} : $dev_href->{'name'} [ $dev_href->{'device'} ]\n" ;
 	}
 	
 	## recordings
@@ -680,7 +680,7 @@ if ($this->debug)
 		$lines[$INDEX_PROG] 	.= sprintf("%-*.*s", $block_width, $block_width, $sched_href->{'title'}) ;
 		$lines[$INDEX_DATE] 	.= sprintf("%-*.*s", $block_width, $block_width, $sched_href->{'date'}) ;
 		$lines[$INDEX_START] 	.= sprintf("%-*.*s", $block_width, $block_width, $sched_href->{'start'}) ;
-		$lines[$INDEX_ADAPTER] 	.= sprintf("%-*.*s", $block_width, $block_width, sprintf("DVB%d", $sched_href->{'adapter'}) ) ;
+		$lines[$INDEX_ADAPTER] 	.= sprintf("%-*.*s", $block_width, $block_width, "DVB$sched_href->{'adapter'}" ) ;
 
 		$lines[$INDEX_END] 		.= sprintf("%*.*s", $block_width, $block_width, $sched_href->{'end'}) ;
 		
@@ -772,7 +772,7 @@ print "format_schedule_by_adap()\n" if $this->debug ;
 	my @lines ;
 	foreach my $adap (sort {$a <=> $b} keys %sched)
 	{
-		my ($head_aref, $lines_aref) = $this->format_schedule(sprintf("DVB%d", $adap), $start_mins, $sched{$adap}) ;
+		my ($head_aref, $lines_aref) = $this->format_schedule("DVB$adap", $start_mins, $sched{$adap}) ;
 		push @lines, @$lines_aref ;
 		push @headings, @$head_aref ;
 		$this->find_blanks($lines_aref, \@blanks) ;
@@ -804,7 +804,7 @@ print "format_unschedule_by_adap()\n" if $this->debug ;
 		$start_mins = $sched_href->{'start_dt_mins'} if !defined($start_mins) ;
 		$start_mins = $sched_href->{'start_dt_mins'} if $start_mins > $sched_href->{'start_dt_mins'} ;
 		
-		my $key = sprintf("DVB%d", $adap) ;
+		my $key = "DVB$adap" ;
 		$sched{$key} ||= [] ;
 		push @{$sched{$key}}, $sched_href ;
 	}

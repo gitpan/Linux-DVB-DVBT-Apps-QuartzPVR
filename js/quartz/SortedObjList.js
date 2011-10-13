@@ -80,10 +80,15 @@ function SortedObjList(keyname, sortfunc, objects)
 // Add an object
 SortedObjList.prototype.add = function (object)
 {
-	// keep track of the order
 	var key = object[this.keyname] ;
-	this.order.push(key) ;
-	this.length = this.order.length ;
+
+	// check for an existing entry
+	if (!this.objects.hasOwnProperty(key))
+	{
+		// keep track of the order
+		this.order.push(key) ;
+		this.length = this.order.length ;
+	}
 
 	// add
 	this.objects[key] = object ;

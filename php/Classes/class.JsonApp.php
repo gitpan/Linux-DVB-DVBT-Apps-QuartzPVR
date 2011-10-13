@@ -19,8 +19,8 @@
 #============================================================================================
 require_once('php/Config/Constants.inc') ;
 
-date_default_timezone_set ( $DATE_TZ ) ;
-
+	// Set the timezone
+	date_default_timezone_set ( DATE_TZ ) ;
 
 	// Update include path to include local library area first
 	$script_filename = $_SERVER{'SCRIPT_FILENAME'} ;

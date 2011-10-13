@@ -11,7 +11,7 @@ use Linux::DVB::DVBT::Apps::QuartzPVR ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgProf ;
 
 # VERSION
-our $VERSION = '6.00' ;
+our $VERSION = '6.02' ;
 
 
 	# Create application and run it
@@ -30,10 +30,10 @@ sub app
 {
 	my ($app, $opts_href, $args_href) = @_ ;
 
-	my $user = $opts_href->{'user'}	|| Linux::DVB::DVBT::Apps::QuartzPVR::Config::Constants::SQL_USER ;
-	my $password = $opts_href->{'password'}	|| Linux::DVB::DVBT::Apps::QuartzPVR::Config::Constants::SQL_PASSWORD ;
+	$opts_href->{'user'}	||= Linux::DVB::DVBT::Apps::QuartzPVR::Config::Constants::SQL_USER ;
+	$opts_href->{'password'}||= Linux::DVB::DVBT::Apps::QuartzPVR::Config::Constants::SQL_PASSWORD ;
 	
-	if (!$user || !$password)
+	if (!$opts_href->{'user'} || !$opts_href->{'password'})
 	{
 		print "Error: You must specify the MySQL username AND password when using this script outside the PVR suite\n" ;
 		exit 1 ;
@@ -43,9 +43,6 @@ sub app
 	my %tvguide_opts = (
 		'app'			=> $app,
 		'sql'			=> $app->sql,						# set to Database handler object
-
-		'user'			=> $user,
-		'password'		=> $password,
 
 		'tbl_recording'	=> $opts_href->{'tbl-record'},			# database table for recordings requests
 		'tbl_listings'	=> $opts_href->{'tbl-listings'},		# database table for tvguide listings
@@ -173,11 +170,11 @@ Video record directory
 
 Audio record directory
 
--video_path=s 	Video path spec [default=\$video_dir/\$genre/\$title/\$tva_series/\$YmdHMS-\$name.ts]
+-video_path=s 	Video path spec [default=$DEF_VIDEO_PATH]
 
 Video record path specification. The variables are expanded for each file.
 
--audio_path=s 	Audio path spec [default=\$audio_dir/\$genre/\$title/\$series/\$YmdHMS-\$name.mp3]
+-audio_path=s 	Audio path spec [default=$DEF_AUDIO_PATH]
 
 Audio record path specification. The variables are expanded for each file.
 
@@ -200,11 +197,11 @@ to search before and after the actual recording time (i.e. a search window)
 When two programs are adjacent on the same adapter, finish the first program this number of seconds early. This allows the
 DVB tuner time to be retuned ready for the next program.
 
--recprog=s 		Recording program [default=$DEF_RECPROG]
+-recprog=s 		Recording program [default=$DEF_PERL_SCRIPTS/$DEF_RECPROG]
 
 Specify the name of the program to be used to record. Default is to use the installed program provided with Linux::DVB::DVBT.
 
--iplayprog=s 		Recording program [default=$DEF_IPLAYPROG]
+-iplayprog=s 		Recording program [default=$DEF_PERL_SCRIPTS/$DEF_IPLAYPROG]
 
 Specify the name of the program to be used to download IPLAYER source.
 
@@ -257,9 +254,19 @@ Filenames extension for file containing multiplex recording list of programs
 
 Print out full report
 
--num_adapters=i			Number of DVB tuners 
+-adapters=s				DVB tuners [default=$DEF_ADAPTERS]
 
-Set the number of DVB adapters to use (will be truncated to match number actually fitted)
+Specify the list of adapters to be used as comma and/or space separated string. Each adapter may be specified
+either as an adapter number or in {adapter}:{frontend} format
+
+-u|'user'=s		User
+
+Specify Mysql user name
+
+-p|'password'=s		Password
+
+Specify Mysql user password
+
 
 [DESCRIPTION]
 

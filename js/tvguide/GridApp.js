@@ -44,11 +44,14 @@ var GridApp = {
 		"tv"		: new Grid(),
 		"radio"		: new Grid()
 	},
-	grid		: null,				// currently displayed grid
+	grid		: null,					// currently displayed grid
 	recList		: new RecList(),		// requested recordings list
 	srchList	: new SearchList(),		// search programs list
 	recorded	: new Recorded(),		// recorded programs page
 	chanSel		: new ChanSel(),		// channel select page
+	scan		: new Scan(),			// channel scan page
+	
+	currentPage	: '',
 	
 	// Other data
 	types		: {
@@ -114,6 +117,7 @@ try {
 		DISPLAY_HOUR: hour, 
 		DISPLAY_CHANIDX: 0,		// this is just the index in the local array (nothing to do with channel name, channel id etc)
 		NUM_PVRS: 1,
+		PVRS: [{adapter:'0', name:''}],
 		LISTINGS_TYPE: "tv",
 		SHOW_PVR: Settings.cookie.showPvr,
 		PROG_POPUP: Settings.cookie.progPopup,
@@ -191,6 +195,15 @@ GridApp.setup = function(settings)
 	{
 		GridApp.settings[setting] = settings[setting] ;
 	}
+	
+	// Create a useful lookup to convert from PVR adapter to the PVR list index
+	GridApp.settings['PVR_LOOKUP'] = {} ;
+	for (var i=0, len=GridApp.settings['PVRS'].length; i < len; i++)
+	{
+		var adapter = GridApp.settings['PVRS'][i].adapter ;
+		GridApp.settings['PVR_LOOKUP'][adapter] = i ;
+	}
+	
 
 	// Update useful date info
 	var dt = DateUtils.datetime2date(GridApp.settings.DISPLAY_DATE, GridApp.settings.DISPLAY_HOUR+':00') ;
@@ -268,6 +281,9 @@ GridApp.setup = function(settings)
 	
 	// Setup ChanSel
 	ChanSel.setup(grid_settings) ;
+	
+	// Setup Scan
+	Scan.setup(grid_settings) ;
 	
 	
 	
@@ -348,6 +364,54 @@ GridApp.setChanSel = function(chanSelEntry)
 		parameters : params
 	}) ;
 }
+
+/*------------------------------------------------------------------------------------------------------*/
+//Get channels
+GridApp.updateChanSel = function()
+{
+	GridApp.get("chanSelUp", {
+		nocache		: 1
+	}) ;
+}
+
+//== Scan ==
+
+/*------------------------------------------------------------------------------------------------------*/
+//Show scan status
+GridApp.showScan = function()
+{
+	// don't show the "loading.." animation for scan updates
+	var showLoading = 1 ;
+	if (GridApp.currentPage == "scan")
+	{
+		// already on this page, so don't show loading animation
+		showLoading = 0 ;
+	}
+	
+	GridApp.get("scanInfo", {
+		showLoading		: showLoading
+	}) ;
+}
+
+/*------------------------------------------------------------------------------------------------------*/
+//Start scanning
+GridApp.startScan = function(settings)
+{
+	var params = $.extend(
+		{
+			file	 	: '',
+			clean		: 0,
+			adpater		: ''
+		},
+		settings || {}
+	) ;
+
+	GridApp.get("scanStart", {
+		nocache		: 1,
+		parameters 	: params
+	}) ;
+}
+
 
 
 //== Recorded ==
@@ -506,7 +570,11 @@ catch (e) {
 GridApp.get = function(cmd, options)
 {
 //	GridApp.loading.show() ;
-	if (GridApp.getting())
+	var showLoading = 1 ;
+	if (options && options.hasOwnProperty('showLoading'))
+		showLoading = options.showLoading ;
+	
+	if (GridApp.getting(showLoading))
 	{
 		// don't run if alrwady running
 		return ;
@@ -660,6 +728,12 @@ try {
 				displayPage = "chanSel" ;
 			}
 			
+			if (reply.data.scan)
+			{
+				GridApp.scan.update(reply.data.scan) ;
+				displayPage = "scan" ;
+			}
+			
 			
 			if (reply.data.schedule)
 			{
@@ -705,6 +779,7 @@ try {
 		// Display
 		if (displayPage)
 		{
+			GridApp.currentPage = displayPage ;
 			GridApp[displayPage].display() ;
 		}
 		else
@@ -751,7 +826,7 @@ catch(e) {
 } 
 
 //--------------------------------------------------------------------------------------------
-GridApp.getting = function()
+GridApp.getting = function(showLoading)
 {
 	var alreadyGetting = 1 ;
 	
@@ -759,7 +834,10 @@ GridApp.getting = function()
 	if (!GridApp.getFlag)
 	{
 		// start new get
-		GridApp.loading.show() ;
+		if (showLoading)
+		{
+			GridApp.loading.show() ;
+		}
 		alreadyGetting = 0 ;
 		GridApp.getFlag = 1 ;
 	}

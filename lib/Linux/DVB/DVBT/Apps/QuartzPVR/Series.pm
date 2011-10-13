@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.003" ;
+our $VERSION = "1.004" ;
 
 #============================================================================================
 # USES
@@ -170,6 +170,9 @@ sub get_vars
 		'episode_num'	=> '',	# Y
 		'name'			=> '',
 		
+		'tva_series_num'=> '',
+		'tva_prog_num'	=> '',
+		
 		# Override with all existing program fields
 		'title'			=> '',
 		'subtitle'		=> '',
@@ -178,6 +181,8 @@ sub get_vars
 		%$rec_href,
 	) ;
 	
+	
+	## Special case for 'dir'
 	my $type = $rec_href->{'chan_type'} ;
 	my $dir = "" ;
 	if ($type eq 'radio')
@@ -191,6 +196,22 @@ sub get_vars
 		$dir = $opts_href->{'video_dir'} ;
 	}
 	$vars{'dir'} = $dir ;
+	
+	## Special case for tva_*
+	$vars{'tva_series_num'} = $vars{'tva_series'} || '' ;
+	$vars{'tva_series_num'} =~ s%/%%g ;
+	$vars{'tva_series'} = '' ;
+	if ($vars{'tva_series_num'})
+	{
+		$vars{'tva_series'} = "Series $vars{'tva_series_num'}" ;
+	}
+	
+	$vars{'tva_prog_num'} = $vars{'tva_prog'} || '' ;
+	$vars{'tva_prog_num'} =~ s%/%%g ;
+	if ($vars{'tva_prog_num'})
+	{
+		$vars{'tva_prog'} = "Program $vars{'tva_prog_num'}" ;
+	}
 	
 
 $opts_href->{'app'}->prt_data("Series::get_vars() - prog=", $rec_href) if $debug ;
@@ -431,6 +452,11 @@ sub tva_text
 
 # ============================================================================================
 # END OF PACKAGE
+
+=back
+
+=cut
+
 1;
 
 __END__

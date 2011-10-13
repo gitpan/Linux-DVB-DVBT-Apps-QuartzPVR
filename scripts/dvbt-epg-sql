@@ -54,7 +54,7 @@ sub app
 	## die on *any* error, so there is no error checking in this script
 	##
 	my $dvb = Linux::DVB::DVBT->new(
-		'adapter_num'	=> $opts_href->{'adapter'},
+		'adapter'	=> $opts_href->{'adapter'},
 	) ;
 	
 	$progname = $app->progname ;
@@ -487,13 +487,7 @@ sub dt2mins
 }
 
 #---------------------------------------------------------------------------------------------------
-
-=item C<start_cmp($prog_a, $prog_b)>
-
-Just compare start time (using start_dt_mins field)
-
-=cut
-
+# Just compare start time (using start_dt_mins field)
 sub start_cmp
 {
 	my ($a, $b) = @_ ;
@@ -556,7 +550,7 @@ Manages DVB epg
 
 [OPTIONS]
 
--a|'adapter'=i			Adapter [default=0]
+-a|dvb|'adapter'=s			Adapter [default=0]
 
 Set DVB adapter number
 

@@ -106,7 +106,7 @@ sub app
 		'vlc -I dummy "$src" --sout "#standard{mux=ps,dst=\"$dest.$ext\",access=file}" vlc://quit' ;
 
 	$progname = $app->name() ;
-	$dvb_name = sprintf "DVB%d", $adap ;
+	$dvb_name = "DVB$adap" ;
 	info("===============================================================") ;
 	info("$progname v$VERSION") ;
 	info("Linux::DVB::DVBT v$Linux::DVB::DVBT::VERSION") ;
@@ -144,7 +144,7 @@ Linux::DVB::DVBT::prt_data("Args=", $args_href, "Opts=", $opts_href, "prog args=
 	## die on *any* error, so there is no error checking in this script
 	##
 	my $dvb = Linux::DVB::DVBT->new(
-		'adapter_num'	=> $adap,
+		'adapter'		=> $adap,
 		'errmode'		=> 'message',
 	) ;
 	
@@ -1102,7 +1102,7 @@ Specify Mysql user password
 
 -dbg-sql=i	Debug sql module
 
--a|'adapter'=i		DVB-T adapter number [default=0]
+-a|'adapter'=s		DVB-T adapter number [default=0]
 
 -root=s				Top directory
 

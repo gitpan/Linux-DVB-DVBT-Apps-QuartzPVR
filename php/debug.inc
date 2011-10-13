@@ -37,7 +37,11 @@ function debug_log_msg($msg)
 	}
 	else
 	{
-		print "<pre>BUGGER!\n</pre>";
+		//print "<pre>BUGGER!\n</pre>";
+		
+		// Unable to write to log file, so degrade gracefully
+		$LOG_PATH = "" ;
+		
 	}
 }
 

@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.007" ;
+our $VERSION = "1.009" ;
 
 #============================================================================================
 # USES
@@ -336,6 +336,9 @@ sub parse_recspec
 	
 print "parse_recspec($rec_spec)\n" if $this->debug >= 2 ;
 
+	## start by converting any %NN% into CHR(NN) (allows for an easier interface between PHP and running the Perl)
+	$rec_spec =~ s/%([\da-f]{2})%/chr(hex($1))/gei ;
+
 	## start by converting any % into $ (allows for an easier interface between PHP and running the Perl)
 	$rec_spec =~ s/%/\$/g ;
 
@@ -343,13 +346,21 @@ print " + recspec=\"$rec_spec\"\n" if $this->debug >= 2 ;
 
 	## get params
 	my %params ;
-	while ($rec_spec =~ m/(\w+):([^:]+):?/g)
+	while ($rec_spec =~ m/(\w+):([^:]*):?/g)
 	{
 		my ($var, $val) = ($1, $2) ;
+		
+		# hex value
 		if ($val =~ /0x([\da-f]+)/i)
 		{
 			$val = hex($1) ;
 		}
+		
+		# remove spaces
+		$val =~ s/^\s+// ;
+		$val =~ s/\s+$// ;
+		
+		# get value
 		$params{$var} = $val ;
 
 print " + $var = $val\n" if $this->debug >= 2 ;

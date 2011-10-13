@@ -594,27 +594,6 @@ TvList.prototype.display_dirsel = function(ol, prog)
 
 
 
-
-///*------------------------------------------------------------------------------------------------------*/
-////Add an in-place editor
-//TvList.prototype.display_inplace_edit = function(ol, width, text, add_editor_fn, className)
-//{
-//	var margin=10 ;
-//	
-//	// Container
-//	var li = this._display_li(ol, width, className) ;
-////	li.style.overflow = 'scroll' ;
-//	
-//	// View - slightly smaller than container
-//	var view = document.createElement("li");
-//	view.className = "edView" ;
-//	view.style.width = (width-2*margin)+'px' ;
-//	view.style.marginLeft = margin+'px' ;
-//	view.appendChild(document.createTextNode(text)) ;
-//	li.appendChild(view) ;
-//	add_editor_fn(view) ;
-//}
-
 /*------------------------------------------------------------------------------------------------------*/
 //Add a text edit
 TvList.prototype.display_edit = function(ol, width, text, add_editor_fn, className)
@@ -625,14 +604,6 @@ TvList.prototype.display_edit = function(ol, width, text, add_editor_fn, classNa
 	var li = this._display_li(ol, width, className) ;
 	
 	// Edit - slightly smaller than container
-//	var view = document.createElement("li");
-//	view.className = "edView" ;
-//	view.style.width = (width-2*margin)+'px' ;
-//	view.style.marginLeft = margin+'px' ;
-//	view.appendChild(document.createTextNode(text)) ;
-//	li.appendChild(view) ;
-//	add_editor_fn(view) ;
-
 	var edit = document.createElement("input");
 	edit.className = "edView" ;
 	edit.style.width = (width-2*margin)+'px' ;
@@ -659,8 +630,8 @@ TvList.prototype.display_labelled_edit = function(ol, labelWidth, label, width, 
 }
 
 /*------------------------------------------------------------------------------------------------------*/
-//Add a text element
-TvList.prototype.display_selector = function(ol, width, value, valuesArray, className, changeHandler)
+//Add a combobox element
+TvList.prototype.display_selector = function(ol, width, value, valuesArray, namesArray, className, changeHandler)
 {
 	var margin=10 ;
 	
@@ -670,10 +641,12 @@ TvList.prototype.display_selector = function(ol, width, value, valuesArray, clas
 	// View - slightly smaller than container
 	var view = document.createElement("li");
 	view.className = "selector" ;
-	view.style.width = (width-2*margin)+'px' ;
+	var selWidth = (width-2*margin) ;
+	view.style.width = selWidth+'px' ;
 	view.style.marginLeft = margin+'px' ;
 	
 		var select = document.createElement("select");
+		select.style.width = selWidth+'px' ;
 		var html = "" ;
 		
 		value = value.toLowerCase() ;
@@ -690,7 +663,7 @@ TvList.prototype.display_selector = function(ol, width, value, valuesArray, clas
 			{
 				html += 'selected="" ' ;
 			}
-			html += 'value="' + valuesArray[i] + '">' + valuesArray[i] + '</option>' + "\n" ;
+			html += 'value="' + valuesArray[i] + '">' + namesArray[i] + '</option>' + "\n" ;
 			
 		}
 		select.innerHTML = html ;
@@ -714,11 +687,11 @@ log.debug("Added selector change handler for "+value);
 
 /*------------------------------------------------------------------------------------------------------*/
 // Labelled selector - returns the select DOM node
-TvList.prototype.display_labelled_select = function(ol, labelWidth, label, width, value, valuesArray, className, changeHandler)
+TvList.prototype.display_labelled_select = function(ol, labelWidth, label, width, value, valuesArray, namesArray, className, changeHandler)
 {
 	// Label
 	this.display_label(ol, labelWidth, label, 'edLabel') ;
-	var select = this.display_selector(ol, width, value, valuesArray, className, changeHandler);
+	var select = this.display_selector(ol, width, value, valuesArray, namesArray, className, changeHandler);
 	
 	return select ;
 }
@@ -809,12 +782,20 @@ TvList.prototype.display_showHide = function(parentNode, ol, idx)
 }
 
 /*------------------------------------------------------------------------------------------------------*/
+//Add a blank element
+//
+TvList.prototype.display_empty = function(ol, width, className)
+{
+	var li = this._display_li(ol, width, className) ;
+	return li ;
+}
+
+/*------------------------------------------------------------------------------------------------------*/
 //Add a blank show/hide element
 //
 TvList.prototype.display_emptyShowHide = function(parentNode, ol, idx)
 {
-	var li ;
-	li = this._display_li(ol, this.settings.HIDE_PX, "showHide") ;
+	var li = this.display_empty(ol, this.settings.HIDE_PX, "showHide") ;
 	return li ;
 }
 

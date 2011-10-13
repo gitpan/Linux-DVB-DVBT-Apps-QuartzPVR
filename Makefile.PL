@@ -7,9 +7,7 @@ use strict;
 use lib './plib' ;
 use Makeutils ;
 
-
-use Data::Dumper ;
-
+#use Data::Dumper ;
 
 	my $clib = "./clib" ;
 
@@ -24,7 +22,7 @@ use Data::Dumper ;
 
 	## Programs to install
 	add_install_progs("scripts/", [
-		qw/dvbt-chans-sql dvbt-epg-sql dvbt-iplay dvbt-multirecord dvbt-record-mgr/
+		qw/dvbt-chans-sql dvbt-epg-sql dvbt-iplay dvbt-multirecord dvbt-record-mgr dvbt-qpvr-scan/
 	]);
 
 
@@ -73,7 +71,7 @@ print "Dist=$dist, web=$webuser:$webgroup root=$webroot\n" if $makeutils::DEBUG 
 			'Test::Pod' => 1.22,
 			'Data::Dumper' => 0,
 			
-			'Linux::DVB::DVBT' => 0,
+			'Linux::DVB::DVBT' => 2.11,
 			'Linux::DVB::DVBT::TS' => 0,
 			'Linux::DVB::DVBT::Advert' => 0,
 			'App::Framework' => 0,
@@ -109,14 +107,14 @@ FORCE :
 	\$(NOECHO) \$(NOOP)
 
 ## Call to QuartzPVR installation script
-pure_site_install :: 
-	$^X $install_script -perl_lib \$(DESTINSTALLSITELIB)
-
 pure_perl_install :: 
-	$^X $install_script -perl_lib \$(DESTINSTALLPRIVLIB)
+	$^X $install_script -perl_lib \$(DESTINSTALLPRIVLIB) -perl_scripts \$(DESTINSTALLSCRIPT) -pm_version \$(VERSION)
+
+pure_site_install :: 
+	$^X $install_script -perl_lib \$(DESTINSTALLSITELIB) -perl_scripts \$(DESTINSTALLSITESCRIPT) -pm_version \$(VERSION)
 
 pure_vendor_install :: 
-	$^X $install_script -perl_lib \$(DESTINSTALLVENDORLIB)
+	$^X $install_script -perl_lib \$(DESTINSTALLVENDORLIB) -perl_scripts \$(DESTINSTALLVENDORSCRIPT) -pm_version \$(VERSION)
 
 " ;
 }
@@ -139,8 +137,56 @@ doxygen: FORCE
 
 ## Author target: preview CPAN documentation
 cpandoc: FORCE
+	$(MAKEPATH) pod/batch
 	perl -MPod::Simple::HTMLBatch -e Pod::Simple::HTMLBatch::go . pod/batch
-	cp pod/html_files/style.css pod/batch/_black_with_blue_on_white.css
+	$(ABSPERLRUN) -MExtUtils::Command -e "cp" -- pod/html_files/style.css pod/batch/_black_with_blue_on_white.css
+
+phpdoc: FORCE
+	perl -MPod::Simple::HTMLBatch -e Pod::Simple::HTMLBatch::go php/doc/src php/doc/pod
+
+MANIFEST: FORCE
+	$(ABSPERLRUN) -MExtUtils::Command -e "mv" -- MANIFEST MANIFEST.bak
+	$(ECHO) "MANIFEST" >>MANIFEST
+	$(ECHO) "README" >>MANIFEST
+	$(ECHO) "COPYING" >>MANIFEST
+	$(ECHO) "Changes" >>MANIFEST
+	$(ECHO) "Makefile.PL" >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "plib/Makeutils.pm" >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "index.php" >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "tpl/grid.tpl" >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## JS" >>MANIFEST
+	find js -type f -name "*.js" | grep -v .svn >>MANIFEST
+	find js -type f -name "*.txt" | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## Tests" >>MANIFEST
+	find t -type f -name "*.t" | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## CSS" >>MANIFEST
+	find css -type f -name "*.css" | grep -v .svn >>MANIFEST
+	find css -type f -name "*.png" | grep -v src | grep -v .svn >>MANIFEST
+	find css -type f -name "*.gif" | grep -v src | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## PHP" >>MANIFEST
+	find php -type f -name "*.inc" | grep -v .svn >>MANIFEST
+	find php -type f -name "*.php" | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## Install" >>MANIFEST
+	find install -type f | grep -v install/quartzpvr-install | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## lib" >>MANIFEST
+	find lib -type f -name "*.pm" | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## Scripts" >>MANIFEST
+	find scripts -type f -name "dvbt-*" | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
+	$(ECHO) "## Doc" >>MANIFEST
+	find php -type f -name "*.html" | grep -v pod | grep -v .svn >>MANIFEST
+	find php -type f -name "*.png" | grep -v src | grep -v .svn >>MANIFEST
+	$(ECHO) "" >>MANIFEST
 
 ';
 }
@@ -258,27 +304,40 @@ sub get_settings
 {
 	my ($settings_href) = @_ ;
 	
+	## List of settings that either require user input or may need checking by the user
 	my @settings = (
-[ "SQL_ROOT_PASSWORD",	"e.g. password",							"MySQL root user password so I can create the pvr database"],
-[ "DVBT_FREQFILE",		"e.g. /usr/share/dvb/dvb-t/uk-Oxford",		"full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)"],
-[ "MAIL_TO", 			$ENV{'user'} || 'e.g. root@somewhere',		"email account to mail PVR errors to"],
-[ "SERVER_PORT", 		"21328",							"TCP port of the new PVR server that I will install"],
-[ "WEB_USER", 			$settings_href->{'WEB_USER'},		"user name of the web server"],
-[ "WEB_GROUP", 			$settings_href->{'WEB_GROUP'},		"group name of the web server"],
-[ "SQL_USER", 			"quartzpvr",						"username of the MySQL pvr database owner"],
-[ "SQL_PASSWORD",		"qp".$$,							"password of the MySQL pvr database owner"],
-[ "PVR_USER", 			"quartzpvr",						"Linux user name created for recording"],
-[ "PVR_GROUP", 			"video",							"Linux group name for PVR_USER"],
-[ "PVR_LOGDIR", 		"/var/log/quartzpvr",				"location of PVR logs"],
-[ "DATABASE", 			"quartzpvr",						"PVR database name"],
-[ "VIDEO_DIR", 			"/var/lib/quartzpvr/video",			"Video recording top-level directory"],
-[ "AUDIO_DIR", 			"/var/lib/quartzpvr/audio",			"Audio recording top-level directory"],
-[ "PVR_ROOT", 			"$settings_href->{'WEB_ROOT'}/quartzpvr", "Installation directory. This is where all of the PVR software is installed."],
+# var					can be null?	default										description
+[ "SQL_ROOT_PASSWORD",	0,				"e.g. password",							"MySQL root user password so I can create the pvr database"],
+[ "DVBT_FREQFILE",		0,				"e.g. /usr/share/dvb/dvb-t/uk-Oxford",		"full path to DVB-T tuning frequency file OR a country code (GB)"],
+[ "MAIL_TO", 			1,				$ENV{'user'} || 'e.g. root@somewhere',		"email account to mail PVR errors to"],
+[ "WEB_USER", 			0,				$settings_href->{'WEB_USER'},				"user name of the web server"],
+[ "WEB_GROUP", 			0,				$settings_href->{'WEB_GROUP'},				"group name of the web server"],
+	) ;
 
+	## List of settings that can be left to their default values
+	my @extra_settings = (
+# var					can be null?	default										description
+[ "SERVER_PORT", 		0,				"21328",									"TCP port of the new PVR server that I will install"],
+[ "SQL_USER", 			0,				"quartzpvr",								"username of the MySQL pvr database owner"],
+[ "SQL_PASSWORD",		0,				"qp".$$,									"password of the MySQL pvr database owner"],
+[ "PVR_USER", 			0,				"quartzpvr",								"Linux user name created for recording"],
+[ "PVR_GROUP", 			0,				"video",									"Linux group name for PVR_USER"],
+[ "PVR_LOGDIR", 		0,				"/var/log/quartzpvr",						"location of PVR logs"],
+[ "DATABASE", 			0,				"quartzpvr",								"PVR database name"],
+[ "VIDEO_DIR", 			0,				"/var/lib/quartzpvr/video",					"Video recording top-level directory"],
+[ "AUDIO_DIR", 			0,				"/var/lib/quartzpvr/audio",					"Audio recording top-level directory"],
+[ "VIDEO_PATH",			0,				"\$video_dir/\$title/\$tva_series/\$YmdHMS-\$name.ts",	"Video recording filename specification"],
+[ "AUDIO_PATH",			0,				"\$audio_dir/\$title/\$series/\$YmdHMS-\$name.mp3",	"Audio recording filename specification"],
+[ "PVR_ROOT", 			0,				"$settings_href->{'WEB_ROOT'}/quartzpvr", 	"Installation directory. This is where all of the PVR software is installed."],
+[ "ADAPTERS", 			1,				"", 										"Space separated list of the adapter numbers to use (leave blank for default)"],
+[ "ADSKIP", 			0,				"1", 										"Advert removal (1=remove adverts, 0=do not remove adverts)"],
+[ "DATE_TZ", 			0,				"Europe/London",							"Your timezone (as defined for the PHP Date object)"],
+[ "PHP_LOG", 			1,				"", 										"Debug: Log file to use for PHP application"],
+[ "SERVER_DEBUG",		0,				"1", 										"Debug: Level of server debug logging"],
 	) ;
 	
+	
 	$settings_href->{'PERL_BIN'} = $^X ;
-	$settings_href->{'DATE_TZ'} = "TZ=GMT" ;
 	$settings_href->{'PVR_HOME'} = "/var/lib/$settings_href->{'PVR_USER'}" ;
 	
 #print Data::Dumper->Dump(["Settings", \%settings]) ;	
@@ -287,7 +346,7 @@ sub get_settings
 	## get any new settings
 	foreach my $aref (@settings)
 	{
-		my ($var, $default, $desc) = @$aref ;
+		my ($var, $null_valid, $default, $desc) = @$aref ;
 #		print "Default=$default\n" ;
 
 		## Amend defaults with existing settings
@@ -307,10 +366,78 @@ sub get_settings
 				$val = $ans ;
 			}
 		
-		} while (!$val) ;
+		} while (!$val && !$null_valid) ;
 		
 		$settings_href->{$var} = $val ;
 	}
+	
+	## Ask if user wants to amend the extra settings
+	my $get_extra = 0 ;
+	print "\nWould you like to use defaults for the next set of settings [yes]: " ;
+	my $ans = <STDIN> ;
+	if ($ans =~ /no/i)
+	{
+		$get_extra = 1 ;
+	}
+
+	## get any default settings
+	foreach my $aref (@extra_settings)
+	{
+		my ($var, $null_valid, $default, $desc) = @$aref ;
+#		print "Default=$default\n" ;
+
+		## Amend defaults with existing settings
+		if ($settings_href->{$var})
+		{
+			$default = $settings_href->{$var} ;
+		}
+		my $val = $default || "" ;
+		
+		if ($get_extra)
+		{
+			do
+			{
+				print "$var: Please enter the $desc [$val]: " ;
+				my $ans = <STDIN> ;
+				chomp $ans ;
+				if ($ans)
+				{
+					$val = $ans ;
+				}
+			
+			} while (!$val && !$null_valid) ;
+		}
+		
+		$settings_href->{$var} = $val ;
+	}
+	
+	
+	## Get the list of all variables
+	my $vars_list = "" ;
+	foreach my $aref (@settings)
+	{
+		my ($var, $null_valid, $default, $desc) = @$aref ;
+		$vars_list .= "$var " ;
+	}
+	foreach my $aref (@extra_settings)
+	{
+		my ($var, $null_valid, $default, $desc) = @$aref ;
+		$vars_list .= "$var " ;
+	}
+	
+	# list of fixed settings
+	$vars_list .= "   " ;
+	foreach my $var (qw/
+		RECPROG IPLAYPROG 
+		PERL_SCRIPTS PERL_LIB PERL_BIN
+		TBL_LISTINGS TBL_RECORD TBL_CHANNELS TBL_RECORDING TBL_RECORDED TBL_SCHEDULE TBL_MULTIREC TBL_IPLAY
+		PVR_HOME
+	/)
+	{
+		$vars_list .= "$var " ;
+	}
+	
+	$settings_href->{'_VARS_LIST_'} = $vars_list ;
 	
 }
 
@@ -346,7 +473,12 @@ sub update_install_script
 	
 	foreach my $var (sort keys %$settings_href)
 	{
-		push @lines, "$var = $settings_href->{$var}" ;
+		my $val = $settings_href->{$var} ;
+		
+		# use % instead of $ to ensure App does not attempt to expand variables
+		$val =~ s/\$/%/g ; 
+		
+		push @lines, "$var = $val" ;
 	}
 	
 	
@@ -399,6 +531,7 @@ sub read_install_script
 		{
 			my ($var, $val) = ($1, $2) ;
 			$val =~ s/\s+$// ;
+			$val =~ s/%/\$/g ;
 			$settings_href->{$var} = $val ;
 		}
 	}

@@ -1097,7 +1097,7 @@ print "start=$start end=$end\n" if $debug ;
 	# sort
 	foreach my $adap (sort { $a <=> $b } keys %cron)
 	{
-		my $dvb = sprintf "DVB%d", $adap ;
+		my $dvb = "DVB$adap" ;
 		
 		my $prev_end = 0 ;
 		my $prev ;
@@ -1151,6 +1151,11 @@ print "start=$start end=$end\n" if $debug ;
 
 # ============================================================================================
 # END OF PACKAGE
+
+=back
+
+=cut
+
 1;
 
 __END__

@@ -1,8 +1,10 @@
 <?php
 
 #-----------------------------------------------------------------
-define('VERSION', '7.04') ;
+define('VERSION', '7.07') ;
 #-----------------------------------------------------------------
+
+define('SERVER_DOWN', -111) ;
 
 #==================================================================
 # USES
@@ -19,19 +21,13 @@ class ListingsApp extends JsonApp
 	var $list_debug=0;
 	
 	var $logging = 0;
-	var $LOG_PATH = "" ;
+	var $LOG_PATH = PHP_LOG ;
 	var $DBG_REC = 0 ;
 	
 	var $NUM_PVRS = 1 ;
+	var $PVRS = array( array('adapter'=>'0:0', 'name'=>'unknown') ) ;
 	var $NUM_HOURS_DISPLAYED = 3 ;
 	var $NUM_CHANS_DISPLAYED = 9 ;
-	
-//	var $no_warnings = 0 ;
-	
-//	# Arrays passed in from Perl script
-//	var $message_array = array() ;
-//	var $record_array = array() ;
-//	var $overlaps_array = array() ;
 	
 	var $prog_fields   = array('pid', 'title', 'date', 'channel', 'start', 'duration', 'text', 'repeat', 'episode', 'num_episodes', 'adapter', 'genre', 'chan_type', 'tva_series') ;
 	var $prog_record_fields   = array('adapter', 'record', 'multid',   'rid', 'priority') ;
@@ -261,6 +257,14 @@ if ($this->irr_debug) $this->debug_prt("params_array=", $this->params_array)  ;
 
 		$json_content = "" ;
 		
+		# recspec
+		$recspec = $this->params_array['rec'] ;
+		
+		# escape spaces
+		$recspec = str_replace(' ', '%20%', $recspec) ;
+		
+		
+		
 		# Set start date = MIN(display date, today)
 		$start_date = $display_date ;
 		$start_datetime = $datetime ;
@@ -298,7 +302,6 @@ $this->debug_prt(" + today < start_date=", $start_date)  ;
 		}		
 		elseif ($json == "rec")
 		{
-			$recspec = $this->params_array['rec'] ;
 $this->debug_prt("record : ", $recspec)  ;
 			$json_content = $this->json_record($recspec, $display_hours, $listings_type, $start_datetime, $start_date, $start_hour, $start) ;
 		}		
@@ -311,7 +314,6 @@ $this->debug_prt("record : ", $recspec)  ;
 		}		
 		elseif ($json == "recListRec")
 		{
-			$recspec = $this->params_array['rec'] ;
 if ($this->logging >= 2) $this->debug_log_msg("record : $recspec\n") ;
 			$json_content = $this->json_recListRec($start_date, $recspec) ;
 		}		
@@ -337,13 +339,11 @@ if ($this->logging >= 2) $this->debug_log_msg("record : $recspec\n") ;
 		elseif ($json == "srchListRec")
 		{
 			$searchParams = $this->searchParams() ;
-			$recspec = $this->params_array['rec'] ;
 			$json_content = $this->json_srchListRec($start_date, $recspec, $searchParams) ;
 		}		
 		elseif ($json == "srchListFuzzyRec")
 		{
 			$searchParams = $this->searchParams() ;
-			$recspec = $this->params_array['rec'] ;
 			$json_content = $this->json_srchListFuzzyRec($start_date, $recspec, $searchParams) ;
 		}		
 		
@@ -358,14 +358,37 @@ if ($this->logging >= 2) $this->debug_log_msg("record : $recspec\n") ;
 			$chanid = $this->params_array['chanid'] ;
 			$json_content = $this->json_chanSelSet($chanid, $chanSetting) ;
 		}		
+		elseif ($json == "chanSelUp")
+		{
+			$json_content = $this->json_chanSelUp() ;
+		}		
 		
+		// Scan
+		elseif ($json == "scanInfo")
+		{
+			$json_content = $this->json_scanInfo() ;
+		}		
+		elseif ($json == "scanStart")
+		{
+			$scan_params = array() ;
+			$scan_params['file'] = $this->params_array['file'] ;
+			$scan_params['clean'] = $this->params_array['clean'] ;
+			$scan_params['adapter'] = $this->params_array['adapter'] ;
+			
+			$json_content = $this->json_scanStart($scan_params) ;
+		}		
+		
+		
+		
+		
+		//== Reply ==
 		if ($this->irr_debug) print "<pre>\n" ;
-
-		
+	
 		// reply		
 		header('Content-type: text/javascript') ;
 		print "{\n" .
 			"\"cmd\" : \"" . $json . "\",\n" .
+			"\"version\" : \"" . VERSION . "\",\n" .
 			"\"data\" : {\n" . $json_content . "}" .
 			"}\n" ;
 
@@ -385,9 +408,8 @@ if ($this->logging) $this->debug_log_msg("JSON = {\n cmd : \"$json\",\n data : {
 		while ($entry = $this->next()) 
 		{
 			$chid = $entry['chan_num'] ;
-			$type = $entry['chan_type'] ;
 			$entry['display'] = 1 ;
-			if (($chid < $start_chan) || ($type != $listings_type))
+			if (($chid < $start_chan) || (strpos($entry['chan_type'], $listings_type) === false) )
 			{
 				$entry['display'] = 0 ;
 			}
@@ -596,13 +618,30 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 
 	
 	
-	//	//== ChanSel ================================================================================================
+	//== ChanSel ================================================================================================
 	
 	#----------------------------------
 	# Return list of channels
 	function json_chanSel() 
 	{
-		# Return schedule
+		# Return info
+		$json_content = "" ;
+
+		// channels
+		$json_content .= "\"chanSel\" : " . $this->_json_chanSel() . "\n" ;
+
+		return $json_content ;
+	}
+
+	#----------------------------------
+	# Return list of channels after updating to match latest scan
+	function json_chanSelUp() 
+	{
+		// Get server to update channels
+		$this->chan_update_cmd() ;
+		
+		
+		# Return info
 		$json_content = "" ;
 
 		// channels
@@ -625,7 +664,7 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 		$this->chaninfo[$chanid]["show"] = $chanSetting ;
 		
 	
-		# Return schedule
+		# Return info
 		$json_content = "" ;
 
 		// Channels list		
@@ -637,6 +676,36 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 		return $json_content ;
 	}
 
+	
+	//== Scan ================================================================================================
+	
+	#----------------------------------
+	# Return scan info
+	function json_scanInfo() 
+	{
+		# Return info
+		$json_content = "" ;
+
+		// channels
+		$json_content .= "\"scan\" : " . $this->scan_info_cmd() . "\n" ;
+
+		return $json_content ;
+	}
+
+	#----------------------------------
+	# Return scan info
+	function json_scanStart( $params = array() ) 
+	{
+		# Return info
+		$json_content = "" ;
+
+		// channels
+		$json_content .= "\"scan\" : " . $this->scan_start_cmd($params) . "\n" ;
+
+		return $json_content ;
+	}
+
+	
 	
 	//==========================================================================================================================
 	// JSON
@@ -678,6 +747,7 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 	{
 		$json_content = "" ;
 
+		$json_content .= "\"PM_VERSION\": \"" . PM_VERSION . "\",\n" ;
 		$json_content .= "\"DISPLAY_DATE\": \"" . $date . "\",\n" ;
 		$json_content .= "\"DISPLAY_HOUR\": " . $start_hour . ",\n" ;
 		$json_content .= "\"DISPLAY_PERIOD\": " . $display_hours . ",\n" ;
@@ -685,13 +755,32 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 
 		# Get number of PVRs in use:
 		$this->record_mgr($date, "info") ;
-//		$this->NUM_PVRS = $this->_get_num_pvrs() ;
-		$json_content .= "\"NUM_PVRS\": " . $this->NUM_PVRS . "\n" ;
+		$json_content .= "\"NUM_PVRS\": " . $this->NUM_PVRS . ",\n" ;
+		$json_content .= "\"PVRS\": " . $this->_json_pvrs() . "\n" ;
 		
 		return "{" . $json_content . "}" ;
 	}
 
+	#----------------------------------
+	# Get pvr list in a Javascript object
+	function _json_pvrs() 
+	{
+		$json_content = "" ;
 
+		foreach ($this->PVRS as $idx => $entry)
+		{
+			$content = "" ;
+			foreach ($entry as $key => $value)
+			{
+				if ($content) $content .= ",\n" ;
+				$content .= "\"" . $key . "\" : " . "\"" . $value . "\"" ;
+			}
+			if ($json_content) $json_content .= ",\n" ;
+			$json_content .= "{" . $content . "}" ;
+		}
+		return "[" . $json_content . "]" ;
+	}
+	
 	#----------------------------------
 	# Get channels in a Javascript object
 	function _json_chans() 
@@ -704,7 +793,7 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 			$chan_content = "" ;
 			foreach ($this->chaninfo as $chid => $entry)
 			{
-				if ($entry['chan_type'] == $ch_type)
+				if (strpos($entry['chan_type'], $ch_type) !== false)
 				{
 					$obj = $this->_json_object("", $entry, $this->json_chans_fields) ;
 		
@@ -732,7 +821,8 @@ $this->debug_prt("CHANIDS:", $this->chanids) ;
 
 		foreach ($this->chaninfo as $chid => $entry)
 		{
-			if (!$ch_type || ($entry['chan_type'] == $ch_type))
+			# ensures hd-tv & tv types match 'tv' type
+			if (!$ch_type || (strpos($entry['chan_type'], $ch_type) !== false))
 			{
 				$json_content = $this->_json_object($json_content, $entry, $this->json_chans_fields) ;
 			}
@@ -1273,7 +1363,7 @@ $this->debug_prt("exists=$exists, isfile=$isfile, size=$size File: ".$file) ;
 		return $json_content ;
 	}
 
-	
+
 	
 	//==========================================================================================================================
 	// UTILS
@@ -1295,9 +1385,88 @@ $this->debug_prt("exists=$exists, isfile=$isfile, size=$size File: ".$file) ;
 			# remove ""s
 			$str = $entry[$key] ;
 			$str = str_replace('"', '', $str) ;
+			$str = str_replace( array("\r\n", "\n\r", "\n", "\r"), ' ', $str) ;
 			$obj .= ' "' . $str . "\"" ;
 		}
 		$new = "[" . $obj . "]" ;
+
+		if ($json_content) $json_content .= ",\n" ;
+		$json_content .= $new ;
+		
+		return $json_content ;
+	}
+
+	//----------------------------------
+	function is_assoc ($arr) {
+        return (is_array($arr) && count(array_filter(array_keys($arr),'is_string')) == count($arr));
+    }
+
+	#----------------------------------
+	# Create a JSON (ARRAY) object from a hierarchical ARRAY
+	#
+	function _json_from_array($json_content, $array) 
+	{
+		$obj = "" ;
+		
+		foreach ($array as $value)
+		{
+			if ($obj) $obj .= ",\n" ;
+			
+			if ($this->is_assoc($value))
+			{
+				$obj .= $this->_json_from_hash("", $value) ;
+			}
+			elseif (is_array($value))
+			{
+				$obj .= $this->_json_from_array("", $value) ;
+			}
+			else
+			{
+				# remove ""s
+				$str = $value ;
+				$str = str_replace('"', '', $str) ;
+				$obj .= ' "' . $str . '"' ;
+			}
+			
+		}
+		$new = "[" . $obj . "]" ;
+
+		if ($json_content) $json_content .= ",\n" ;
+		$json_content .= $new ;
+		
+		return $json_content ;
+	}
+
+    
+	#----------------------------------
+	# Create a JSON (HASH) object from a hierarchical HASH
+	#
+	function _json_from_hash($json_content, $hash) 
+	{
+		$obj = "" ;
+		
+		foreach ($hash as $key => $value)
+		{
+			if ($obj) $obj .= ",\n" ;
+			$obj .= ' "' . $key . '" : ' ;
+			
+			if ($this->is_assoc($value))
+			{
+				$obj .= $this->_json_from_hash("", $value) ;
+			}
+			elseif (is_array($value))
+			{
+				$obj .= $this->_json_from_array("", $value) ;
+			}
+			else
+			{
+				# remove ""s
+				$str = $value ;
+				$str = str_replace('"', '', $str) ;
+				$obj .= ' "' . $str . '"' ;
+			}
+		}
+		$new = "{" . $obj . "}" ;
 
 		if ($json_content) $json_content .= ",\n" ;
 		$json_content .= $new ;
@@ -1556,7 +1725,6 @@ $this->debug_prt("exists=$exists, isfile=$isfile, size=$size File: ".$file) ;
 
 		$output=array() ;
 		$results=array() ;
-		$ret_val=0;
 		$execcmd = "" ;
 		
 		$json = "" ;
@@ -1586,31 +1754,16 @@ $this->debug_prt("exists=$exists, isfile=$isfile, size=$size File: ".$file) ;
 $this->debug_prt("RUN: $execcmd\n") ;
 //if ($this->logging >= 2) $this->debug_log_msg("RUN: $execcmd $options\n") ;
 
-			# NB: $DVB_RECORD_MGR = runas record_mgr
-			# this avoids having to tell sudo which user to runas
-// 			exec("$execcmd  2>&1", $output, $ret_val) ;
-	
-			$ret_val = 0 ;
-			$fp = fsockopen("localhost", SERVER_PORT, $errno, $errstr, 30);
-			if (!$fp) 
-			{
-				$ret_val = -1 ;
-			} 
-			else 
-			{
-				fwrite($fp, "$execcmd\n");
-				while (!feof($fp)) 
-				{
-					array_push($output, fgets($fp, 512)) ;
-				}
-				fclose($fp);
-			}
+			// get server to run command
+			$retval = 0 ;
+			$output = array() ;
+			list($retval, $output) = $this->server_cmd($execcmd) ;
 
 
 	#$this->handle_error($output) ;
 
-$this->debug_prt("REPLY: $ret_val : ", $output) ;
-if ($this->logging >= 2) $this->debug_log_msg("REPLY: $ret_val : ") ;
+$this->debug_prt("REPLY: $retval : ", $output) ;
+if ($this->logging >= 2) $this->debug_log_msg("REPLY: $retval : ") ;
 if ($this->logging >= 2) $this->debug_log_var($output) ;
 
 			## process output
@@ -1625,65 +1778,17 @@ if ($this->logging >= 2) $this->debug_log_var($output) ;
 			#	
 			#
 			$messages = array() ;
-			$text = array() ;
 			$msg_type = "" ;
 			
-			$php = "" ;
-			$in_php = false ;
-			foreach ($output as $line)
-			{
-				# look for php
-				if (strpos($line, '<?php') !== false)
-				{
-					//$php .= $line . "\n" ;
-					$in_php = true ;
-				}
-				elseif ($in_php)
-				{
-					if (strpos($line, '?>') !== false)
-					{
-						//$php .= $line . "\n" ;
-						$in_php = false ;
-					}
-					else
-					{
-						$php .= $line ;
-					}
-				}
-				else 
-				{
-					array_push($text, $line) ;
-				}
-			}
-			
+			$text = array() ;
+			list($php, $text) = $this->server_output_php($output) ;
 			if ($php)
 			{
 				eval("$php") ;
 			}
 
 			## Handle errors
-			if ($ret_val!=0)
-			{
-				// Error (handle_error() copes with string or array)
-				//$this->handle_error($output) ;
-				
-				# Return error
-				$msg_type = "error" ;
-				if (!count($messages))
-				{
-					$messages = array("Unexpected error when running Perl script program scheduler : " . $ret_val) ;
-				}
-				$messages = array_merge($messages, $text) ;
-				
-				
-			}
-			
-			## Return any messages
-			if (count($messages))
-			{
-				$msg_type = $msg_type ? "info" : $msg_type ;
-				$json = "{" . $this->_json_msg($msg_type, $messages) . "}" ;
-			}
+			$json = $this->handle_cmd_errors($json, $retval, $messages, $msg_type, $text) ;
 			
 			switch($cmd)
 			{
@@ -1698,12 +1803,205 @@ if ($this->logging >= 2) $this->debug_log_var($output) ;
 					{
 						$this->NUM_PVRS = $NUM_PVRS ;
 					}
+					if ($PVRS)
+					{
+						$this->PVRS = $PVRS ;
+					}
 					break ;
 			}
 			
 			
 		}	
 		
+		return $json ;
+	}
+	
+	#---------------------------------------------------------------------------------------------------
+	function chan_update_cmd()
+	{
+		// get server to run command
+		list($retval, $output) = $this->server_cmd("dvb_chans") ;
+	}
+	
+	#---------------------------------------------------------------------------------------------------
+	function scan_info_cmd()
+	{
+		$json = "" ;
+
+		// get server to run command
+		list($retval, $output) = $this->server_cmd("dvb_scan_info") ;
+
+$this->debug_log_msg("scan_info_cmd() retval=$retval \n") ;
+		
+		## process output
+		#
+		# Should be of the form:
+		#	<?php
+		#	$msg_type = "warning" ;
+		#	$messages = array(
+		#		"line 1",
+		#		"another line"
+		#	) ;
+		#	
+		#
+		$messages = array() ;
+		$msg_type = "" ;
+		
+		$text = array() ;
+		list($php, $text) = $this->server_output_php($output) ;
+		if ($php)
+		{
+			$STATUS = array() ;
+			eval("$php") ;
+			
+			$json = $this->_json_from_hash($json, $STATUS) ;
+			
+			if (array_key_exists("BUSY", $STATUS))
+			{
+				if ($STATUS["BUSY"])
+				{
+					array_push($messages, "Adapter already busy, please try again later ") ;
+				}
+			}
+		}
+		else
+		{
+			$json = "{}" ;
+		}
+$this->debug_log_msg(" + json=$json\n") ;
+		
+		## Handle errors
+		$json = $this->handle_cmd_errors($json, $retval, $messages, $msg_type, $text) ;
+			
+		return $json ;
+	}
+	
+	#---------------------------------------------------------------------------------------------------
+	function scan_start_cmd( $params = array() )
+	{
+		$args = "" ;
+		if ($params['adapter'])
+		{
+			$args .= "-a " . $params['adapter'] . " " ;
+		}
+		if ($params['clean'])
+		{
+			$args .= "-clean " ;
+		}
+		
+		if ($params['file'])
+		{
+			$args .= $params['file'] ;
+		}
+		else
+		{
+			$args .= DVBT_FREQFILE ;
+		}
+		
+		// get server to run command
+		list($retval, $output) = $this->server_cmd("dvb_scan $args") ;
+
+		return $this->scan_info_cmd() ;
+	}
+	
+	#---------------------------------------------------------------------------------------------------
+	function server_cmd($execcmd)
+	{
+		$retval = 0 ;
+		$output = array() ;
+		$fp = fsockopen("localhost", SERVER_PORT, $errno, $errstr, 30);
+		if (!$fp) 
+		{
+			$retval = SERVER_DOWN ;
+		} 
+		else 
+		{
+			fwrite($fp, "$execcmd\n");
+			while (!feof($fp)) 
+			{
+				array_push($output, fgets($fp, 512)) ;
+			}
+			fclose($fp);
+		}
+		
+		return array($retval, $output) ;
+		
+	}
+
+	#---------------------------------------------------------------------------------------------------
+	function server_output_php( $output = array() )
+	{
+		$text = array() ;
+		$php = "" ;
+
+		$in_php = false ;
+		foreach ($output as $line)
+		{
+			# look for php
+			if (strpos($line, '<?php') !== false)
+			{
+				//$php .= $line . "\n" ;
+				$in_php = true ;
+			}
+			elseif ($in_php)
+			{
+				if (strpos($line, '?>') !== false)
+				{
+					//$php .= $line . "\n" ;
+					$in_php = false ;
+				}
+				else
+				{
+					$php .= $line ;
+				}
+			}
+			else 
+			{
+				array_push($text, $line) ;
+			}
+		}
+
+		return array($php, $text) ;
+	}
+
+	//----------------------------------------------------------------------
+	function handle_cmd_errors($json, $retval, $messages=array(), $msg_type="", $text=array())
+	{
+$this->debug_log_msg("handle_cmd_errors(rc=$retval, type=$msg_type)\n") ;
+		if ($retval!=0)
+		{
+			$msg_type = "error" ;
+			if (!count($messages))
+			{
+				$new_message = "" ;
+				if ($retval == SERVER_DOWN)
+				{
+					$new_message = "Unable to contact QuartzPVR server" ;
+$this->debug_log_msg(" + server down\n") ;
+				}
+				else
+				{
+					$new_message = "Unexpected error when running Perl script program scheduler : " . $retval ;
+				}
+				array_push($messages,$new_message) ;
+				$res = array_merge($messages, $text) ;
+$this->debug_log_msg(" + new message=" . $new_message) ;
+$this->debug_prt(" + messages=", $messages) ;
+$this->debug_prt(" + res=", $res) ;
+			}
+		}
+$this->debug_prt("handle_cmd_errors(type=$msg_type) messages=", $messages) ;
+
+
+		## Return any messages
+		if (count($messages))
+		{
+			$msg_type = $msg_type ? $msg_type : "info" ;
+			if ($json) $json .= ",\n" ;
+			$json .= "\"message\" : " . "{" . $this->_json_msg($msg_type, $messages) . "}" ;
+		}
+			
+
 		return $json ;
 	}
 	
@@ -2014,7 +2312,10 @@ $this->debug_prt("Final multirec=", $multirec) ;
 		}
 		else
 		{
-			print "<pre>BUGGER!\n</pre>";
+			//print "<pre>BUGGER!\n</pre>";
+			
+			// Unable to write to log file, so degrade gracefully
+			$this->LOG_PATH = "" ;
 		}
 	}
 	
@@ -2061,7 +2362,14 @@ $app->run(array(
 	'chanid'=>'',
 	'show'=>'',
 
-	'json'=>'',		// JSON command
+	// scan
+	'file'=>'',
+	'clean'=>0,
+	'adapter'=>'',
+
+
+	// JSON command
+	'json'=>'',		
 
 	'dbg'=>0));
 

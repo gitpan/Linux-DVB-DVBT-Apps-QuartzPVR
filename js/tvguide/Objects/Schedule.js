@@ -10,7 +10,7 @@ Displays this as a "thin bar" at the top of the display with highlighted regions
 // Constructor
 function Schedule(pvr, settings)
 {
-	this.pvr = pvr ;			// pvr index number
+	this.pvr = pvr ;			// pvr adapter number <adapter>:<frontend>
 	this.settings = settings ;	// ref to Grid.settings
 	this.recordings = new SortedObjList( "pid", Recording.prog_sort ) ;
 }

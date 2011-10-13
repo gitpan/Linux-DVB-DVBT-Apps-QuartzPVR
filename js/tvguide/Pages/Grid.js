@@ -54,48 +54,6 @@ Grid.prototype.lookup_recording = function(pid)
 	return this.complete_schedule[pid] ;
 }
 
-///*------------------------------------------------------------------------------------------------------*/
-////Add/Create channels
-////
-////chans_data is a HASH of the form:
-////
-////chan_id : [ "chan name", canIPLAY ]
-////
-//Grid.prototype.update_chans = function(chans_data)
-//{
-//	Profile.start('Grid.update_chans') ;
-//
-////	// Delete any channels not in the new list
-////	for (var chanid in this.chan_list)
-////	{
-////		if (typeof chans_data[chain] == "undefined")
-////		{
-////			delete this.chan_list[chanid] ;
-////		}
-////	}
-//	
-//	// Create channel objects
-//	for (var chanid in chans_data)
-//	{
-//		// see if already created
-//		if (!this.chan_list[chanid])
-//		{
-//			var chanEntry = chans_data[chanid] ;
-//			
-//			// new
-//			var chanName = chanEntry[0] ;
-//			var chanIplay = chanEntry[1] ;
-//			this.chan_list[chanid] = chanName ;
-//			this.channels.add(new Chan(chanid, chanName, chanIplay)) ;
-//			
-//			// reverse lookup
-//			this.chan_map[chanName] = chanid ;
-//		}
-//	}
-//
-//	Profile.stop('Grid.update_chans') ;
-//}
-
 /*------------------------------------------------------------------------------------------------------*/
 //Add/Create channels
 //
@@ -113,15 +71,6 @@ Grid.prototype.update_chans = function(chans_data)
 {
 	Profile.start('Grid.update_chans') ;
 
-//	// Delete any channels not in the new list
-//	for (var chanid in this.chan_list)
-//	{
-//		if (typeof chans_data[chain] == "undefined")
-//		{
-//			delete this.chan_list[chanid] ;
-//		}
-//	}
-	
 	// Create channel objects
 	for (var chanid in chans_data)
 	{
@@ -131,7 +80,6 @@ Grid.prototype.update_chans = function(chans_data)
 		var show = chanEntry[2] ;		// user wants this channel to be displayed
 		var chanIplay = chanEntry[3] ;
 		var type = chanEntry[4] ;
-//		var display = chanEntry[5] ;	// combination of settings means this channel is currently on display
 		
 		// see if already created
 		if (!this.chan_list[chanid])
@@ -209,10 +157,10 @@ Grid.prototype.redisplay_progs = function(progs_list)
 	var gridbox = this.dom['gridbox'] ;
 	if (Grid.settings.SHOW_PVR)
 	{
-		for (var pvr=0; pvr < this.schedule_list.length; ++pvr)
+		for (var pvr_index=0; pvr_index < this.schedule_list.length; ++pvr_index)
 		{
-			var schedule = this.schedule_list[pvr].display() ;
-			var prev_schedule = this.dom['schedule'][pvr] ;
+			var schedule = this.schedule_list[pvr_index].display() ;
+			var prev_schedule = this.dom['schedule'][pvr_index] ;
 			
 			if (prev_schedule)
 			{
@@ -223,7 +171,7 @@ Grid.prototype.redisplay_progs = function(progs_list)
 				gridbox.appendChild(schedule) ;
 			}
 	
-			this.dom['schedule'][pvr] = schedule ;
+			this.dom['schedule'][pvr_index] = schedule ;
 		}
 	}
 
@@ -284,9 +232,10 @@ Grid.prototype.update_schedule = function(schedule_data, multirec_data, iplay_da
 		else
 		{
 			// create
-			for (var i=this.schedule_list.length-1; i < Grid.settings.NUM_PVRS; ++i)
+			for (var i=this.schedule_list.length; i < Grid.settings.NUM_PVRS; ++i)
 			{
-				this.schedule_list[i] = new Schedule(i, Grid.settings) ;
+				var adapter = Grid.settings.PVRS[i].adapter ;
+				this.schedule_list[i] = new Schedule(adapter, Grid.settings) ;
 			}
 		}
 	}
@@ -294,17 +243,17 @@ Grid.prototype.update_schedule = function(schedule_data, multirec_data, iplay_da
 	// log.dbg(this.logDebug, "Grid.update_schedule() - empty schedule : num pvrs="+this.schedule_list.length) ;
 	
 	// Empty the schedules - create list of affected progs
-	for (var pvr=0; pvr < this.schedule_list.length; ++pvr)
+	for (var pvr_index=0; pvr_index < this.schedule_list.length; ++pvr_index)
 	{
-if (!this.schedule_list.hasOwnProperty(pvr))
+if (!this.schedule_list.hasOwnProperty(pvr_index))
 {
 	var bugger=1 ;
 }
 		
-		var recordings = this.schedule_list[pvr].values() ;
-		this.schedule_list[pvr].empty() ;
+		var recordings = this.schedule_list[pvr_index].values() ;
+		this.schedule_list[pvr_index].empty() ;
 
-		// log.dbg(this.logDebug, " * recordings["+pvr+"] = ", recordings) ;
+		// log.dbg(this.logDebug, " * recordings["+pvr_index+"] = ", recordings) ;
 		
 		// clear prog and save in list
 		for (var i=0; i < recordings.length; ++i)
@@ -362,10 +311,9 @@ if (!this.schedule_list.hasOwnProperty(pvr))
 		var entry = multirec_data[i] ;
 
 		var multid = parseInt(entry[0], 10) ;
-		var pvr = parseInt(entry[6], 10) || 0 ;
+//		var pvr = parseInt(entry[6], 10) || 0 ;
+		var adapter = entry[6] ;
 
-		// log.dbg(this.logDebug, "Grid.update_schedule() - multirec "+multid+" pvr "+pvr) ;
-		
 		var multirec = new Multirec(entry) ;
 		if (multirec)
 		{
@@ -396,12 +344,6 @@ if (!this.schedule_list.hasOwnProperty(pvr))
 	// Work through the entries
 	for (var i=0; i < schedule_data.length; i++)
 	{
-Grid.sched_i = i ;
-Grid.dbg_trace=0 ;
-if (i>100)
-{
-	Grid.bugger=1;
-}
 		var entry = schedule_data[i] ;
 
 		// see if we've got this channel/program
@@ -410,23 +352,20 @@ if (i>100)
 		var chan = this.channels.get(chanid) ;
 		if (chan)
 		{
-Grid.dbg_trace=1 ;
 			// try getting prog
 			var prog = chan.get_prog(pid) ;
 			if (prog)
 			{
-Grid.dbg_trace=2 ;
 				var rid = parseInt(entry[0], 10) ;
 				var record = parseInt(entry[3], 10) ;
 				
-				var pvr = 0 ;
+				var adapter = Grid.settings.PVRS[0].adapter ;
 				var multid = 0 ;
 				var type = 'p' ;
 
 				// check for IPLAY entry
 				if (entry.length <= 4)
 				{
-Grid.dbg_trace=3 ;
 					// We only want to look at ilpay entries that do NOT have an associated DVBT
 					// Since I've concat'd the 2 lists, just leave display to the DVBT record
 					if (Prog.hasDVBT(record))
@@ -436,8 +375,7 @@ Grid.dbg_trace=3 ;
 				}
 				else
 				{
-Grid.dbg_trace=4 ;
-					pvr = parseInt(entry[4], 10) ;
+					adapter = entry[4] ;
 					multid = entry[5] ;
 					type = entry[6] ;
 				}
@@ -447,23 +385,23 @@ Grid.dbg_trace=4 ;
 				// Skip multiplex recordings
 				if (type != 'mp')
 				{
-Grid.dbg_trace=5 ;
 					if (Prog.hasOnlyIPLAY(record))
 					{
-Grid.dbg_trace=6 ;
 						// IPLAY-only
 						recording = new Recording(rid, chanid, record, prog, multid) ;
 					}
 					else
 					{
-Grid.dbg_trace=7 ;
 						// Add to schedule list
-						recording = this.schedule_list[pvr].add(rid, chanid, record, prog, multid) ;
+						if (Grid.settings.PVR_LOOKUP.hasOwnProperty(adapter))
+						{
+							var pvr_index = Grid.settings.PVR_LOOKUP[adapter] ;
+							recording = this.schedule_list[pvr_index].add(rid, chanid, record, prog, multid) ;
+						}
 					}
 				}
 				else
 				{
-Grid.dbg_trace=8 ;
 					recording = multirec_list[multid].add_prog(rid, chanid, record, prog, multid) ;
 				}
 
@@ -473,23 +411,16 @@ Grid.dbg_trace=8 ;
 				if (recording)
 					this.complete_schedule[pid] = recording ;
 				
-//				// Compare existing setting with new setting
-//				if ( (prog.record != record) || (prog.pvr != pvr) )
-//				{
-					redisplay = true ;
-					
-					// update prog
-					prog.pvr = pvr ;
-					prog.record = record ;
-					
-					// add to list
-					affected_progs[pid] = prog ;
-					
-//					// TODO: handle the info... (cache the affected programs?)
-//				}
+				redisplay = true ;
+				
+				// update prog
+				prog.pvr = adapter ;
+				prog.record = record ;
+				
+				// add to list
+				affected_progs[pid] = prog ;
 			}
 		}
-Grid.dbg_trace=9 ;
 	}
 
 	// Now add multirec entries to the schedule list iff the multirec contains some programs
@@ -499,30 +430,26 @@ Grid.dbg_trace=9 ;
 		if (multirec.progs.length)
 		{
 			// Add to schedule list
-			var pvr = multirec.pvr ;
-			var recording = this.schedule_list[pvr].add(0, 0, 0, multirec, multid) ;
+			var adapter = multirec.pvr ;
+			if (Grid.settings.PVR_LOOKUP.hasOwnProperty(adapter))
+			{
+				var pvr_index = Grid.settings.PVR_LOOKUP[adapter] ;
+				var recording = this.schedule_list[pvr_index].add(0, 0, 0, multirec, multid) ;
+			}
+			
 		}
 	}
 
 	
 	
-	// log.dbg(this.logDebug, "Grid.update_schedule() - create display list") ;
-//	// log.dbg(this.logDebug, "Grid.update_schedule() - affected list", affected_progs) ;
-	
 	// create a list
 	var redisplay_schedule = [] ;
 	for (var pid in affected_progs)
 	{
-//		// log.dbg(this.logDebug, " + pid="+pid, affected_progs[pid]) ;
 		redisplay_schedule.push(affected_progs[pid]) ;
 	}
 
 	Profile.stop('Grid.update_schedule') ;
-	
-//	// log.dbg(this.logDebug, "Grid.update_schedule() - multirec list = ", multirec_list) ;
-//	// log.dbg(this.logDebug, "Grid.update_schedule() - schedule list = ", this.schedule_list) ;
-	
-	// log.dbg(this.logDebug, "Grid.update_schedule() - END") ;
 	
 	return redisplay_schedule ;
 }
@@ -733,11 +660,13 @@ Grid.prototype.switchListings = function(nextType)
 Grid.prototype.display_head = function()
 {
 	var listingsType = Grid.settings.LISTINGS_TYPE ;
+	var version = Grid.settings.PM_VERSION ;
 	var dispCurrName = Grid.settings.app.types[listingsType].display ;
 	var nextType = Grid.settings.app.types[listingsType].other ;
 	
 	TitleBar.display_head(
-		dispCurrName+" Listings (JQuery "+$.fn.jquery+")", 
+//		dispCurrName+" Listings (JQuery "+$.fn.jquery+")", 
+		dispCurrName+" Listings (V "+version+")", 
 		"Switch to "+nextType+" listings", 
 		Grid.settings.app.create_handler(this.switchListings, nextType), 
 		'Grid'
@@ -782,12 +711,12 @@ var body_pad = 100 ;
 	// Display recording schedule
 	if (Grid.settings.SHOW_PVR)
 	{
-		for (var pvr=0; pvr < this.schedule_list.length; ++pvr)
+		for (var pvr_index=0; pvr_index < this.schedule_list.length; ++pvr_index)
 		{
-			var schedule = this.schedule_list[pvr].display() ;
+			var schedule = this.schedule_list[pvr_index].display() ;
 			gridbox.appendChild(schedule) ;
 			
-			this.dom['schedule'][pvr] = schedule ;
+			this.dom['schedule'][pvr_index] = schedule ;
 		}
 	}
 

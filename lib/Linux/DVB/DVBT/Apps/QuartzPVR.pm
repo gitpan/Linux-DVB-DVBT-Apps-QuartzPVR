@@ -16,7 +16,7 @@ Linux::DVB::DVBT::Apps::QuartzPVR - PVR Application
 This is a bundle module that installs a complete PVR application that uses a web frontend for 
 TV listings display and for managing recordings.
 
-
+=over 4
 
 =cut
 
@@ -24,13 +24,12 @@ TV listings display and for managing recordings.
 #============================================================================================
 # USES
 #============================================================================================
-use Linux::DVB::DVBT ;
-
 use Linux::DVB::DVBT::Apps::QuartzPVR::Base::Object ;
 
 use Linux::DVB::DVBT::Apps::QuartzPVR::Base::Constants ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgProf ;
+
 use Linux::DVB::DVBT::Apps::QuartzPVR::Series ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Recording ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Report ;
@@ -40,11 +39,12 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::Prog ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Sql ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Crontab ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Mail ;
+use Linux::DVB::DVBT::Apps::QuartzPVR::DVB ;
 
 #============================================================================================
 # GLOBALS
 #============================================================================================
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 
 #============================================================================================
@@ -113,8 +113,9 @@ my %FIELDS = (
 	'password'		=> '',
 	
 	## DVB
-	'devices'		=> [],
+	'adapters'		=> undef,		# string list of adapters tro use
 	'num_adapters'	=> 0,
+	'devices'		=> [],
 	
 	## Internal
 	'_tvsql'		=> undef,		# Linux::DVB::DVBT::Apps::QuartzPVR::Sql object
@@ -232,16 +233,12 @@ sub new
 	) ;
 
 	## Get number of available DVB adapters
-  	my @devices = Linux::DVB::DVBT->device_list() ;
-	my $total_num_adapters = @devices ;
-	my $num_adapters = $args{'num_adapters'} || $total_num_adapters ;
-	$num_adapters = $total_num_adapters if ($num_adapters > $total_num_adapters) ;
-	
-#	die "Error: You must have at least one DVB-T adapter available for recording" unless $num_adapters ;
+	my @devices = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::set_useable_adapters($this->adapters) ;
+	my $num_adapters = scalar(@devices) ;
 	
 	$this->set(
-		'devices'		=> \@devices,
 		'num_adapters'	=> $num_adapters,
+		'devices'		=> \@devices,
 	) ;
 	
 	# report
@@ -657,12 +654,24 @@ sub show_info
 	my $this = shift ;
 	my ($opts_href) = @_ ;
 	
+print STDERR "QuartzPVR::show_info()\n" if $this->debug ;
+	
 	my %info; 
 	
 	$info{'NUM_PVRS'} = $this->num_adapters() ;
 	
-	my $devices_aref = $this->devices ;
+	$info{'PVRS'} = [] ;
+	my $devices_aref = $this->devices() ;
+	foreach my $device_href (@$devices_aref)
+	{
+		push @{$info{'PVRS'}}, {
+			'adapter'	=> Linux::DVB::DVBT::Apps::QuartzPVR::DVB::device2adapter($device_href), 
+			'name'		=> $device_href->{'name'},
+		};
+	}	
 	
+Linux::DVB::DVBT::prt_data("Devices=", $devices_aref) if $this->debug ;
+Linux::DVB::DVBT::prt_data("Info=", \%info) if $this->debug ;
 	
 	## Output to PHP if required
 	if ($this->php)
@@ -755,18 +764,77 @@ sub php_message
 #	...
 #	?>
 #
+sub php_var
+{
+	my $this = shift ;
+	my ($var) = @_ ;
+
+print STDERR "QuartzPVR::php_var($var)\n" if $this->debug ;
+
+	my $php = "" ;
+	if (!ref($var))
+	{
+		$php .= "\"$var\"" ;
+	}
+	elsif (ref($var) eq 'ARRAY')
+	{
+		$php .= " array( " ;
+		for (my $i=0; $i < @$var; ++$i)
+		{
+			$php .= ", " if $i ;
+			$php .= $this->php_var($var->[$i]) ;
+		}
+		$php .= " )\n" ;
+	}
+	elsif (ref($var) eq 'HASH')
+	{
+		$php .= " array( " ;
+		
+		my $i = 0 ;
+		foreach my $key (sort keys %$var)
+		{
+			$php .= ", " if $i++ ;
+			$php .= "'$key'=>" ;
+			$php .= $this->php_var($var->{$key}) ;
+		}
+		$php .= " )\n" ;
+	}
+	
+print STDERR "QuartzPVR::php_var($var) - done : php=$php\n" if $this->debug ;
+
+	return $php ;
+}
+
+
+
+#--------------------------------------------------------------------------------------------
+# Format a HASH (consisting of key/scalar value pairs)into PHP
+#
+# Should be of the form:
+#
+#	<?php
+#	$key1 = "scalar1" ;
+#	...
+#	?>
+#
 sub php_info
 {
 	my $this = shift ;
 	my ($hash_ref) = @_ ;
 
+print STDERR "QuartzPVR::php_info()\n" if $this->debug ;
+	
 	my $php = "<?php\n" ;
 	foreach my $key (sort keys %$hash_ref)
 	{
-		$php .= "\$$key = \"$hash_ref->{$key}\";\n" ;
+		$php .= "\$$key = " ;
+		$php .= $this->php_var($hash_ref->{$key}) ;
+		$php .= ";\n" ;
 	}
 
 	$php .= "?>\n\n" ;
+
+print STDERR "QuartzPVR::php_info() - done : php=$php\n" if $this->debug ;
 	
 	print $php ;
 }

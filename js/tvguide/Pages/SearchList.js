@@ -194,9 +194,15 @@ SearchList.setup = function(settings)
 	SearchList.settings.EDIT_TITLE_PX = SearchList.settings.LABEL_TITLE_PX ;
 	SearchList.settings.EDIT_DESC_PX = SearchList.settings.LABEL_DESC_PX ;
 	SearchList.settings.EDIT_GENRE_PX = SearchList.settings.LABEL_GENRE_PX ;
-	SearchList.settings.EDIT_CHAN_PX = SearchList.settings.LABEL_CHAN_PX ;
-	SearchList.settings.EDIT_TYPE_PX = SearchList.settings.LABEL_TYPE_PX ;
+	SearchList.settings.EDIT_CHAN_PX = 200 ;
+	SearchList.settings.EDIT_TYPE_PX = 110 ;
 	SearchList.settings.EDIT_MIN_PX = 50 ;
+
+	SearchList.settings.END_MARGIN_PX = 10 ;
+	
+	
+	// max length in chars
+	SearchList.settings.CHAN_MAX_LEN = 16 ;
 	
 	SearchList.settings.SEARCH_PX = SearchList.settings.REC_PX ;
 	
@@ -410,12 +416,15 @@ SearchList.prototype.chan_select_array = function()
 	channels.push(anyChans) ;
 	
 	var type = this.typeValue() ;
+//	var re = new RegExp(type.replace('-', '\-')) ;
+	var re = new RegExp(type) ;
 	var chansList = this.settings.app.allChansList.values() ;
 	for (var i=0, len=chansList.length; i<len; i++)
 	{
 		if (chansList[i].show)
 		{
-			if (!type || (chansList[i].type == type))
+			// check type (match hd-tv & tv with type 'tv')
+			if (!type || (chansList[i].type.search(re) >= 0))
 			{
 				channels.push(chansList[i].name) ;
 			}
@@ -423,6 +432,25 @@ SearchList.prototype.chan_select_array = function()
 	}
 
 	return channels ;
+}
+
+/*------------------------------------------------------------------------------------------------------*/
+// Convert channel fullnames into list of truncated names
+SearchList.prototype.chan_names_array = function(channels)
+{
+	var channelNames = [] ;
+	for (var i=0, len=this.channels.length; i<len; i++)
+	{
+		var name = this.channels[i] ;
+		var nameLen = name.length ;
+		if (name.length > SearchList.settings.CHAN_MAX_LEN)
+		{
+			name = name.substr(0, SearchList.settings.CHAN_MAX_LEN-3) + '...' ;
+		}
+		channelNames[i] = name ;
+	}
+	
+	return channelNames ;
 }
 
 
@@ -442,13 +470,11 @@ SearchList.prototype.update_rec_sel = function()
 		if (channel)
 		{
 			// ok to show
-//			DomUtils.show(children[i]) ;
 			$(children[i]).show() ;
 		}
 		else
 		{
 			// hide
-//			DomUtils.hide(children[i]) ;
 			$(children[i]).hide() ;
 		}
 	}
@@ -461,15 +487,17 @@ SearchList.prototype.update_chan_select = function()
 {
 	// Get list of channels (based on listings type)
 	this.channels = this.chan_select_array() ;
+	var channelNames = this.chan_names_array(this.channels) ;
 
 	// Re-add new list
 	var newSelect = document.createElement("select");
 	for (var i=0, len=this.channels.length; i<len; i++)
 	{
 		var option = document.createElement("option");
+		option.setAttribute('value', this.channels[i]) ; 
 		if (this.channel == this.channels[i])
 			option.setAttribute('selected', 'selected') ; 
-		option.appendChild(document.createTextNode(this.channels[i])) ;
+		option.appendChild(document.createTextNode(channelNames[i])) ;
 		newSelect.appendChild(option) ;
 	}
 	
@@ -486,8 +514,6 @@ SearchList.prototype.update_chan_select = function()
 		$(newSelect).change(changeHandler) ;
 	}
 	
-	// Adjust the main search bar elements so they fit the window width
-//	this.sizeSearchBar() ;	
 }
 
 
@@ -498,12 +524,11 @@ SearchList.prototype.display_chan_select = function(ol)
 {
 	// Get list of channels
 	this.channels = this.chan_select_array() ;
+	var channelNames = this.chan_names_array(this.channels) ;
 	var anyChans = SearchList.SELECT.ANY_CHAN ;
 	
 	function createChangeHandler(searchObject) {
 		return function() {
-			//var option = this.options[this.selectedIndex] ;
-			//var value = searchObject.chanValue(option.value) ;
 			var value = searchObject.chanValue(searchObject.channels[this.selectedIndex]) ;
 			
 			log.debug("chan change handler : value "+value);			
@@ -512,7 +537,6 @@ SearchList.prototype.display_chan_select = function(ol)
 			searchObject.update_rec_sel() ;
 
 			// save for re-use when changing recordings
-//			SearchList.latestSearch = searchObject ;			
 			SearchList.copySearch(searchObject, SearchList.latestSearch) ;
 		} ;
 	}
@@ -520,7 +544,7 @@ SearchList.prototype.display_chan_select = function(ol)
 	// create selector
 	this.chanSelector = this.display_labelled_select(ol, 
 			SearchList.settings.LABEL_CHAN_PX, 'Channel:', 
-			SearchList.settings.EDIT_CHAN_PX, this.channel, this.channels, 
+			SearchList.settings.EDIT_CHAN_PX, this.channel, this.channels, channelNames, 
 			'select',
 			createChangeHandler(this)) ;
 }
@@ -535,6 +559,7 @@ SearchList.prototype.display_type_select = function(ol)
 	
 	types.push(anyTypes) ;
 	types.push("TV") ;
+	types.push("HD-TV") ;
 	types.push("Radio") ;
 		
 	function createChangeHandler(searchObject) {
@@ -553,7 +578,6 @@ SearchList.prototype.display_type_select = function(ol)
 			searchObject.update_chan_select() ;
 			
 			// save for re-use when changing recordings
-//			SearchList.latestSearch = searchObject ;			
 			SearchList.copySearch(searchObject, SearchList.latestSearch) ;
 		} ;
 	}
@@ -561,7 +585,7 @@ SearchList.prototype.display_type_select = function(ol)
 	// create selector
 	this.typeSelector = this.display_labelled_select(ol, 
 			SearchList.settings.LABEL_TYPE_PX, 'Type:', 
-			SearchList.settings.EDIT_TYPE_PX, this.listingsType, types, 
+			SearchList.settings.EDIT_TYPE_PX, this.listingsType, types, types,
 			'select',
 			createChangeHandler(this)) ;
 }
@@ -582,7 +606,6 @@ SearchList.prototype.popup_fuzzyrecsel_contents = function(popupDiv, record_sele
 	this.recList = recUl ;
 	
 	// Find all entries that rely on the channel name being specified
-//	this.recList.reqChannel = DomUtils.getElementsByClassName("chan", this.recList) ;
 	this.recList.reqChannel = $(".chan", $(this.recList)).toArray() ;
 
 	// Update the dialog based on the channel name selection 
@@ -645,7 +668,6 @@ SearchList.prototype.add_fuzzy_record_popup = function(node)
 				// Call the fuzzy record method
 				var old_rec = progObject.record ;
 				progObject.record = new_rec ;
-//				thisObj.recselCallback(progObject, old_rec) ;
 				SearchList.setFuzzyRecordings(progObject);
 				
 			}
@@ -660,13 +682,6 @@ SearchList.prototype.add_fuzzy_record_popup = function(node)
 //Add a record level selection element
 SearchList.prototype.display_fuzzyrecsel = function(ol)
 {
-//	var li ;
-//
-//	li = document.createElement("li");
-//	li.className = "lcol" ;
-//	li.style.width = this.settings.REC_PX+'px' ;
-//	ol.appendChild(li) ;
-
 	// Container
 	var li = this._display_li(ol, this.settings.REC_PX, "") ;
 	
@@ -736,36 +751,6 @@ SearchList.prototype.update_search = function(search_data)
 }
 
 
-///*------------------------------------------------------------------------------------------------------*/
-////Create a "in-place" editor that pops up over the node and allows editing of the node value
-////
-//SearchList.prototype.factory_edit_search = function(type)
-//{
-//	var searchList = this ;
-//	
-//	return function(node) {
-//		InPlace.add_inplace(node, search_change, searchList) ; 
-//		
-//		//----------------------------------------------------------------------------
-//		// Priority change callback
-//		function search_change(searchObject, new_val) {
-//		
-//			
-//			// only update if changed
-//			if (new_val != searchObject[type])
-//			{
-//				searchObject[type] = new_val ;
-////				SearchList.latestSearch = searchObject ;			// save for re-use when changing recordings
-////				SearchList.settings.app.showSearch(searchObject) ;
-//				SearchList.copySearch(searchObject, SearchList.latestSearch) ;
-//				
-//				// amend the gui to reflect the latest search settings
-//				searchObject.updateSearchForm() ;
-//			}
-//		}
-//	} ;
-//}
-
 /*------------------------------------------------------------------------------------------------------*/
 //Create a text editor
 //
@@ -773,26 +758,26 @@ SearchList.prototype.factory_edit_search = function(type)
 {
 var searchList = this ;
 
-return function(node) {
-	
-	//----------------------------------------------------------------------------
-	// Value change callback
-	function search_change(searchObject, new_val) {
+	return function(node) {
 		
-		// only update if changed
-		if (new_val != searchObject[type])
-		{
-			searchObject[type] = new_val ;
-			SearchList.copySearch(searchObject, SearchList.latestSearch) ;
+		//----------------------------------------------------------------------------
+		// Value change callback
+		function search_change(searchObject, new_val) {
 			
-			// amend the gui to reflect the latest search settings
-			searchObject.updateSearchForm() ;
+			// only update if changed
+			if (new_val != searchObject[type])
+			{
+				searchObject[type] = new_val ;
+				SearchList.copySearch(searchObject, SearchList.latestSearch) ;
+				
+				// amend the gui to reflect the latest search settings
+				searchObject.updateSearchForm() ;
+			}
 		}
-	}
-	
-	// Create the text edit
-	$(node).change(function(){search_change(searchList, node.value)})
-} ;
+		
+		// Create the text edit
+		$(node).change(function(){search_change(searchList, node.value)})
+	} ;
 }
 
 
@@ -805,12 +790,8 @@ SearchList.prototype.sizeSearchBar = function()
 	
 	// find labels & editors
 	var sb$ = $(this.searchBar) ;
-//	var labels = DomUtils.getElementsByClassName('edLabel', this.searchBar) ;
-//	var editors = DomUtils.getElementsByClassName('editor', this.searchBar) ;
-//	var selectors = DomUtils.getElementsByClassName('select', this.searchBar) ;	// fixed width
 	var labels = $('.edLabel', sb$).toArray() ;
 	var editors = $('.editor', sb$).toArray() ;
-	var selectors = $('.select', sb$).toArray() ;	// fixed width
 
 	var labelsWidth=0;
 	var numLabels = labels.length ;
@@ -819,11 +800,7 @@ SearchList.prototype.sizeSearchBar = function()
 		labelsWidth += $(labels[i]).width() ;
 	}
 
-	var selectWidth=0;
-	for (var i=0, len=selectors.length; i<len; i++)
-	{
-		selectWidth += $(selectors[i]).width() ;
-	}
+	var selectWidth=SearchList.settings.EDIT_CHAN_PX + SearchList.settings.EDIT_TYPE_PX;
 
 	var inputWidth = 0 ;
 	var minWidth = 0 ;
@@ -838,7 +815,8 @@ SearchList.prototype.sizeSearchBar = function()
 	var available = SearchList.settings.TOTAL_PX - (
 		SearchList.settings.REC_PX +
 		SearchList.settings.SEARCH_PX +
-		selectWidth
+		selectWidth +
+		SearchList.settings.END_MARGIN_PX
 	) ;
 	
 	//	Total > available:
@@ -983,16 +961,18 @@ SearchList.prototype.search_row = function(ol)
 	// Genre
 	this.display_labelled_edit(ol, SearchList.settings.LABEL_GENRE_PX, 'Genre:', SearchList.settings.EDIT_GENRE_PX, this.genre, this.factory_edit_search('genre'), 'editor') ;
 
-	// Description
-	this.display_labelled_edit(ol, SearchList.settings.LABEL_DESC_PX, 'Description:', SearchList.settings.EDIT_DESC_PX, this.desc, this.factory_edit_search('desc'), 'editor') ;
-
-	
 	// Listings Type
 	this.display_type_select(ol) ;
 
 	// Channel
 	this.display_chan_select(ol) ;
 
+
+	// Description
+	this.display_labelled_edit(ol, SearchList.settings.LABEL_DESC_PX, 'Description:', SearchList.settings.EDIT_DESC_PX, this.desc, this.factory_edit_search('desc'), 'editor') ;
+
+	// End
+	this.display_empty(ol, SearchList.settings.END_MARGIN_PX) ;
 	
 	// Ensure "form" reflects the current state
 	this.updateSearchForm() ;

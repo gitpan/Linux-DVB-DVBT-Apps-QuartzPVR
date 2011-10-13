@@ -43,6 +43,8 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::Prog ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::Crontab ;
 use Linux::DVB::DVBT::Apps::QuartzPVR::DVB ;
 
+use Linux::DVB::DVBT::Utils ;
+
 #============================================================================================
 # OBJECT HIERARCHY
 #============================================================================================
@@ -259,18 +261,6 @@ Linux::DVB::DVBT::Apps::QuartzPVR::Prog::disp_sched("P0 Unscheduled=", $unschedu
 	## If allowed, group into multiplex blocks
 	if ($options{'enable_multirec'})
 	{
-#		# remove any recording duplication
-#		$recording_schedule_aref = $this->remove_recording_duplicates($recording_schedule_aref, $schedule_aref) ;
-#		
-#		# get next available multid
-#		my $next_multid = $this->next_multid($schedule_aref) ;
-#		
-#		## Group new recordings into multiplex blocks
-#		$recording_schedule_aref = $this->block_multiplex($recording_schedule_aref, %options, 'multid' => $next_multid) ;
-#
-#		## Attempt to add new recordings into the existing set
-#		$recording_schedule_aref = $this->schedule_block_multiplex($recording_schedule_aref, $schedule_aref, %options) ;
-
 		# Mark any multiplexes that are currently recording (or will be recording) as 'locked'
 		$this->lock_multiplexes($schedule_aref) ;
 
@@ -418,11 +408,6 @@ print "\n==========================================================\n" ;
 	## Need to propogate the DVB adapter down from the 'multiplex' container into each sub-prog
 	$this->update_multiplex($schedule_aref) ;
 
-
-#	## If timeslip is enabled, then flag each recording with whether it can be timeslipped or not
-#	$this->flag_timeslip($schedule_aref, %options) ;
-
-
 	# update the array passed in 
 	@$requested_rec_aref = @$recording_schedule_aref ;
 
@@ -540,19 +525,6 @@ print " + + + No status : amended details\n" if $this->debug ;
 				}
 			}
 		}
-		
-		
-#		## delete any existing entries
-#		foreach my $idx (keys %$recorded_files_href)
-#		{
-#			$tvsql->delete_recorded($recorded_files_href->{$idx}) ;	
-#		}
-#		
-#		## Create new
-#		foreach my $idx (keys %$recorded_files_href)
-#		{
-#			$tvsql->insert_recorded($recorded_files_href->{$idx}) ;	
-#		}
 	}
 
 
@@ -603,8 +575,6 @@ sub unschedule
 				# Need to amend the prog to remove it from the multiplex
 				$prog_href->{'multid'} = 0 ;
 			}
-
-			
 		}
 		else
 		{
@@ -645,7 +615,8 @@ print "\n -- schedule (adjacent=$options{adjacent}) --\n\n" if $this->debug ;
 Linux::DVB::DVBT::Apps::QuartzPVR::Prog::disp_sched("Sorted recordings:", \@recordings) if $this->debug ;
 	
 	## Keep track of the DVB adapter
-	my $adapter = 0 ;
+	my $default_adapter = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::index2adapter(0) ;
+	my $adapter_idx = 0 ;
 	
 	# a schedule list per adapter - makes it quicker to search for overlaps
 	my @adapter_schedule ;
@@ -656,9 +627,10 @@ Linux::DVB::DVBT::Apps::QuartzPVR::Prog::disp_sched("Sorted recordings:", \@reco
 		@$schedule_aref = sort { Linux::DVB::DVBT::Apps::QuartzPVR::Prog::prog_cmp($a, $b) } @$schedule_aref ;
 		foreach my $prog_href (@$schedule_aref)
 		{
-			my $adapter = $prog_href->{'adapter'} || 0 ;
-			$adapter_schedule[$adapter] ||= [] ;
-			push @{$adapter_schedule[$adapter]}, $prog_href ;
+			my $adap = $prog_href->{'adapter'} || $default_adapter ;
+			my $adap_idx = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::adapter2index($adap) ;
+			$adapter_schedule[$adap_idx] ||= [] ;
+			push @{$adapter_schedule[$adap_idx]}, $prog_href ;
 
 			Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($prog_href, "copied existing") ;
 		}
@@ -669,10 +641,11 @@ Linux::DVB::DVBT::Apps::QuartzPVR::Prog::disp_sched("Sorted recordings:", \@reco
 if ($this->debug)
 {
 	print "Existing schedule (Num PVR=$num_adapters):\n" ;
-	for (my $adapter=0; $adapter < $num_adapters; ++$adapter)
+	for (my $adapter_num=0; $adapter_num < $num_adapters; ++$adapter_num)
 	{
-		print "  [Adapter $adapter]\n" ;
-		foreach my $prog_href (@{$adapter_schedule[$adapter]})
+		my $adap = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::index2adapter($adapter_num) ;
+		print "  [Adapter $adap]\n" ;
+		foreach my $prog_href (@{$adapter_schedule[$adapter_num]})
 		{
 			print "    $prog_href->{title}  $prog_href->{date} $prog_href->{start} : start_dt_mins=$prog_href->{'start_dt_mins'}\n" ;	
 		}
@@ -696,23 +669,24 @@ if ($this->debug)
 		my $scheduled = 0 ;
 		for (my $adapter_num=0; !$scheduled && ($adapter_num < $num_adapters); ++$adapter_num)
 		{
-			$adapter_schedule[$adapter] ||= [] ;
+			my $adapter = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::index2adapter($adapter_idx) ;
+			$adapter_schedule[$adapter_idx] ||= [] ;
 			
-			my $dvb = sprintf "dvb%d", $adapter ;
+			my $dvb = "dvb$adapter" ;
 
 print "-> adapter=$adapter\n" if $this->debug ;	
 			
 			## check to see if we can add this to the current schedule
-			if ($this->can_schedule($adapter_schedule[$adapter], $prog_href))
+			if ($this->can_schedule($adapter_schedule[$adapter_idx], $prog_href))
 			{
 				Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($prog_href, "can schedule on $dvb") ;
 
 				## iff required: only add if not adjacent
-				if ($options{'adjacent'} || ! $this->prog_adjacent($adapter_schedule[$adapter], $prog_href))
+				if ($options{'adjacent'} || ! $this->prog_adjacent($adapter_schedule[$adapter_idx], $prog_href))
 				{
 					## add and set adapter
 					$prog_href->{'adapter'} = $adapter ;
-					push @{$adapter_schedule[$adapter]}, $prog_href ;
+					push @{$adapter_schedule[$adapter_idx]}, $prog_href ;
 					
 					Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($prog_href, "** scheduled on $dvb **") ;
 
@@ -732,7 +706,7 @@ print " + + Scheduled onto adapter=$adapter!\n\n" if $this->debug ;
 			if (!$scheduled)
 			{		
 				## next adapter
-				$adapter = ($adapter+1) % $num_adapters ;
+				$adapter_idx = ($adapter_idx+1) % $num_adapters ;
 
 print " + + FAILED to schedule\n\n" if $this->debug ;	
 			}
@@ -751,12 +725,13 @@ print " + + FAILED to schedule\n\n" if $this->debug ;
 if ($this->debug)
 {
 	print "Final schedule:\n" ;
-	for (my $adapter=0; $adapter < $num_adapters; ++$adapter)
+	for (my $adapter_num=0; $adapter_num < $num_adapters; ++$adapter_num)
 	{
-		print "  [Adapter $adapter]\n" ;
-		foreach my $prog_href (@{$adapter_schedule[$adapter]})
+		my $adap = Linux::DVB::DVBT::Apps::QuartzPVR::DVB::index2adapter($adapter_num) ;
+		print "  [Adapter $adap]\n" ;
+		foreach my $prog_href (@{$adapter_schedule[$adapter_num]})
 		{
-			print "    $prog_href->{title}  : $prog_href->{'start_dt_mins'}\n" ;	
+			print "    $prog_href->{title}  $prog_href->{date} $prog_href->{start} : start_dt_mins=$prog_href->{'start_dt_mins'}\n" ;	
 		}
 	}
 	

@@ -71,6 +71,7 @@ TitleBar.addTool = function(toolImg, toolHint, toolCallback)
 TitleBar.display_head = function(titleText, titleHint, titleCallback, currTool)
 {
 	var themePath = Settings.themePath() ;
+	var app = TitleBar.settings.app ;
 	
 	//	<!-- Heading -->
 	//	<div class="hd" id="list-hd">
@@ -124,18 +125,26 @@ TitleBar.display_head = function(titleText, titleHint, titleCallback, currTool)
 			this.toolDiv.appendChild(img) ;
 			
 			// Settings
-			this.addTool("tools", "Edit settings", TitleBar.settings.app.create_handler(Settings.set, "")) ;
+			this.addTool("tools", "Edit settings", app.create_handler(Settings.set, "")) ;
 			
 			// Grid
 			if (currTool != 'Grid')
 			{
-				this.addTool("tv", "EPG", TitleBar.settings.app.create_handler(TitleBar.settings.app.showGrid, "")) ;
+				this.addTool("tv", "EPG", app.create_handler(app.showGrid, "")) ;
+			}
+			else
+			{
+				this.addTool("tv-grey", "", null) ;
 			}
 				
 			// Recordings list
 			if (currTool != 'RecList')
 			{
-				this.addTool("reclist", "Recordings", TitleBar.settings.app.create_handler(TitleBar.settings.app.showRecordings, "")) ;
+				this.addTool("reclist", "Recordings", app.create_handler(app.showRecordings, "")) ;
+			}
+			else
+			{
+				this.addTool("reclist-grey", "", null) ;
 			}
 			
 			// Search
@@ -144,22 +153,44 @@ TitleBar.display_head = function(titleText, titleHint, titleCallback, currTool)
 				function new_search_handler()
 				{
 				   	return function() { 
-				   		TitleBar.settings.app.showSearch(SearchList.latestSearch) ;
+				   		app.showSearch(SearchList.latestSearch) ;
 				   	} ;
 				} 
 				this.addTool("search", "Search", new_search_handler()) ;
+			}
+			else
+			{
+				this.addTool("search-grey", "", null) ;
 			}
 			
 			// Recorded programs
 			if (currTool != 'Recorded')
 			{
-				this.addTool("play", "Recorded Programs", TitleBar.settings.app.create_handler(TitleBar.settings.app.showRecorded, "")) ;
+				this.addTool("play", "Recorded Programs", app.create_handler(app.showRecorded, "")) ;
+			}
+			else
+			{
+				this.addTool("play-grey", "", null) ;
 			}
 			
 			// Recorded programs
 			if (currTool != 'ChanSel')
 			{
-				this.addTool("chansel", "Displayed Channels", TitleBar.settings.app.create_handler(TitleBar.settings.app.showChanSel, "")) ;
+				this.addTool("chansel", "Displayed Channels", app.create_handler(app.showChanSel, "")) ;
+			}
+			else
+			{
+				this.addTool("chansel-grey", "", null) ;
+			}
+			
+			// Recorded programs
+			if (currTool != 'Scan')
+			{
+				this.addTool("scan", "Scan for channels", app.create_handler(app.showScan, "")) ;
+			}
+			else
+			{
+				this.addTool("scan-grey", "", null) ;
 			}
 			
 			

@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.010" ;
+our $VERSION = "1.011" ;
 
 #============================================================================================
 # USES
@@ -275,13 +275,13 @@ sub init_sql
 
 				'insert_recording'		=> {
 					'table'		=> $tbl_recording,
-					'vars'		=> [qw/pid channel title date start duration episode num_episodes record tva_series priority pathspec/],
+					'vars'		=> [qw/pid channel title date start duration record tva_series priority pathspec/],
 					'vals'		=> $sql_vars_href,
 				}, 
 
 				'update_recording'	=> {
 					'table'		=> $tbl_recording,
-					'vars'		=> [qw/pid channel title date start duration episode num_episodes record tva_series priority pathspec/],
+					'vars'		=> [qw/pid channel title date start duration record tva_series priority pathspec/],
 					'vals'		=> $sql_vars_href,
 					'where'		=> {
 						'vars'		=> [qw/id/],

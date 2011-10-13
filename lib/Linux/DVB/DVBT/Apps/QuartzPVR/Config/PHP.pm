@@ -24,6 +24,7 @@ None that I know of!
 
 =head1 INTERFACE
 
+=over 4
 
 =cut
 
@@ -65,7 +66,7 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::Config::PHP::Install ;
 #============================================================================================
 # GLOBALS
 #============================================================================================
-our $VERSION = '2.000' ;
+our $VERSION = '2.001' ;
 
 
 our $DEBUG = 0 ;
@@ -201,9 +202,10 @@ sub require_php
 					{
 						# Remove whitespace & comments
 						chomp $line ;
+						$line =~ s/\#.*// ;
+						$line =~ s%//.*%% ;
 						$line =~ s/^\s+// ;
 						$line =~ s/\s+$// ;
-						$line =~ s/\#.*// ;
 
 						# Strip out php
 						$line =~ s/\<\?php// ;
@@ -499,6 +501,11 @@ BEGIN
 
 # ============================================================================================
 # END OF PACKAGE
+
+=back
+
+=cut
+
 1;
 
 __END__

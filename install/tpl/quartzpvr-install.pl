@@ -9,8 +9,21 @@ use Config::Crontab ;
 use Linux::DVB::DVBT ;
 
 
+## MySQL tables current versions
+our %table_versions = (
+	'database'		=> '1.00',
+	'channels'		=> '1.01',
+	'iplay'			=> '1.00',
+	'listings'		=> '1.00',
+	'multirec'		=> '1.00',
+	'record'		=> '1.00',
+	'recorded'		=> '1.00',
+	'schedule'		=> '1.00',
+) ;
+
+
 # VERSION
-our $VERSION = '1.01' ;
+our $VERSION = '2.00' ;
 our $DEBUG = 0 ;
 
 	# Create application and run it
@@ -32,7 +45,11 @@ sub app
 	$DEBUG = $opts_href->{'debug'} ;
 	
 	my %settings = get_config($app) ;
-	$settings{'perl_lib'} = $opts_href->{'perl_lib'} ;
+	foreach my $var (qw/perl_lib perl_scripts pm_version/)
+	{
+		$settings{$var} = $opts_href->{$var} ;
+		$settings{uc $var} = $opts_href->{$var} ;
+	}
 	
 $app->prt_data("Settings", \%settings) if $DEBUG ;
 
@@ -197,11 +214,26 @@ Linux::DVB::DVBT::prt_data("dvbt_blocks=", \@dvbt_blocks) if $DEBUG ;
 		print " * Written crontab\n" ;	      
 	      
 	}
+	
+	## Clear out any previous logs
+	foreach my $log (glob("$home/*.log"))
+	{
+		if (-f $log)
+		{
+			unlink $log ;
+		}
+	}
+	
 }
+
+#======================================================================
+# MYSQL
+#======================================================================
 
 
 #----------------------------------------------------------------------
 # MySQL
+#
 #
 sub create_database
 {
@@ -209,32 +241,16 @@ sub create_database
 
 	print "Setting up MySQL ..\n" ;
 	
+	my ($results_aref, $status) ;
+	my $sql ;
+	my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+	
 	## Check for user
-	my $temp0 = "tmp0-$$.sql" ;
-	open my $fh, ">$temp0" or die "Error: Unable to create temp file : $!" ;
-	print $fh <<SQL ;
+	$sql =<<SQL ;
 SELECT user from mysql.user where user='$settings_href->{SQL_USER}';
 SQL
-	close $fh ;
+	$results_aref = mysql_runit($app, $password, $sql, "MySQL error while checking for user") ;
 
-	my $results_aref = runit($app,
-		"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0",
-		"MySQL error while checking for user"
-	) ;
-
-#	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp0") ;
-#	my $results_aref = $app->run()->results ;
-#	my $status = $app->run()->status ;
-#	if ($status)
-#	{
-#		print "Error: MySQL error while loading $temp0\n" ;
-#		foreach (@$results_aref)
-#		{
-#			print "$_\n" ;
-#		}
-#		exit 1 ;
-#	}
-	
 	my $create_user = 1 ;
 	if (@$results_aref)
 	{
@@ -243,12 +259,11 @@ SQL
 	
 	
 	## Create user if required
-	my $temp1 = "tmp1$$.sql" ;
-	open my $fh, ">$temp1" or die "Error: Unable to create temp file : $!" ;
 	if ($create_user)
 	{
 		print " * Create user $settings_href->{SQL_USER}\n" ;
-		print $fh <<SQL ;
+		
+		$sql =<<SQL ;
 	
 CREATE USER '$settings_href->{SQL_USER}'\@'localhost' IDENTIFIED BY  '$settings_href->{SQL_PASSWORD}';
 GRANT USAGE ON * . * TO  '$settings_href->{SQL_USER}'\@'localhost' IDENTIFIED BY  '$settings_href->{SQL_PASSWORD}' WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
@@ -261,7 +276,7 @@ SQL
 	else
 	{
 		print " * Update user $settings_href->{SQL_USER}\n" ;
-		print $fh <<SQL ;
+		$sql =<<SQL ;
 	
 SET PASSWORD FOR '$settings_href->{SQL_USER}'\@'localhost' = PASSWORD('$settings_href->{SQL_PASSWORD}') ;
 GRANT USAGE ON * . * TO  '$settings_href->{SQL_USER}'\@'localhost' IDENTIFIED BY  '$settings_href->{SQL_PASSWORD}' WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
@@ -271,42 +286,53 @@ GRANT ALL PRIVILEGES ON  `$settings_href->{DATABASE}` . * TO  '$settings_href->{
 
 SQL
 	}
-	close $fh ;
+	$results_aref = mysql_runit($app, $password, $sql, "MySQL error while creating database") ;
 
-	runit($app,
-		"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp1",
-		"MySQL error while creating database"
+
+	## Check for versions
+	my %versions = (
+		'database'		=> '0',
+		'channels'		=> '0',
+		'iplay'			=> '0',
+		'listings'		=> '0',
+		'multirec'		=> '0',
+		'record'		=> '0',
+		'recorded'		=> '0',
+		'schedule'		=> '0',
 	) ;
 
-#	$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp1") ;
-#	$status = $app->run()->status ;
-#	if ($status)
-#	{
-#		print "Error: MySQL error while loading $temp1\n" ;
-#		$results_aref = $app->run()->results ;
-#		foreach (@$results_aref)
-#		{
-#			print "$_\n" ;
-#		}
-#		exit 1 ;
-#	}
+	my $got_versions = 0 ;
+
+	$sql =<<SQL ;
+SELECT `item`,`version` from $settings_href->{DATABASE}.versions ;
+SQL
+	($results_aref, $status) = mysql_try_runit($app, $password, $sql) ;
 	
+	if ($status == 0)
+	{
+		if (@$results_aref)
+		{
+			$got_versions = 1 ;
+			foreach my $line (@$results_aref)
+			{
+				if ($line =~ /(\S+)\s+([\d\.]+)/)
+				{
+					my ($var, $ver) = ($1, $2) ;
+					next if $var eq 'item' ;
+					$versions{$var} = $ver ;
+				}
+			}
+		}
+	}
 	
+
 	## Check for listings
-	my $temp3 = "tmp3-$$.sql" ;
-	open my $fh, ">$temp3" or die "Error: Unable to create temp file : $!" ;
-	print $fh <<SQL ;
+	my $got_listings = 0 ;
+	$sql =<<SQL ;
 SELECT * from $settings_href->{DATABASE}.listings LIMIT 1 ;
 SQL
-	close $fh ;
-
-	my $got_listings = 0 ;
-	$app->run(
-		'cmd' 		=> "mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp3",
-		'on_error'	=> 'status',
-	) ;
-	my $results_aref = $app->run()->results ;
-	my $status = $app->run()->status ;
+	($results_aref, $status) = mysql_try_runit($app, $password, $sql) ;
+	
 	if ($status == 0)
 	{
 		if (@$results_aref)
@@ -314,54 +340,171 @@ SQL
 			$got_listings = 1 ;
 		}
 	}
-	
 
-	my $temp2 ;
 	if ($got_listings)
 	{
-		print "Already got listings table, skipping\n" ;
+		print "Already got listings table, checking table versions...\n" ;
+		
+		foreach my $table (qw/channels iplay listings multirec record recorded schedule/)
+		{
+			my $current_ver = $versions{$table} ;
+			my $latest_ver = $table_versions{$table} ;
+			if ($current_ver ne $latest_ver)
+			{
+				no strict 'refs' ;
+				print " * Updating table '$table'\n" ;
+				
+				my $update_fn = "update_table_$table" ;
+				&$update_fn($app, $settings_href, $current_ver, $latest_ver) ;
+			}
+		}
+		
+		## Ensure versions table exists
+		$sql = $app->data("versions.sql") ;
+		$sql =~ s/\%DATABASE\%/$settings_href->{'DATABASE'}/g ;
+		
+		mysql_runit($app, $password, $sql, "MySQL error while creating versions table") ;
 	}
 	else
 	{
 		print "Creating new tables ..\n" ;
 
 		## Create tables	
-		my $sql = $app->data("sql") ;
+		$sql = $app->data("sql") . $app->data("versions.sql") ;
 		$sql =~ s/\%DATABASE\%/$settings_href->{'DATABASE'}/g ;
-		$temp2 = "tmp2$$.sql" ;
-		open my $fh, ">$temp2" or die "Error: Unable to create temp file : $!" ;
-		print $fh $sql ;
-		close $fh ;
-	
-
-		runit($app,
-			"mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp2",
-			"MySQL error while creating tables"
-		) ;
-
-#		$app->run("mysql -uroot -p$settings_href->{SQL_ROOT_PASSWORD} < $temp2") ;
-#		$status = $app->run()->status ;
-#		if ($status)
-#		{
-#			print "Error: MySQL error while loading $temp2\n" ;
-#			$results_aref = $app->run()->results ;
-#			foreach (@$results_aref)
-#			{
-#				print "$_\n" ;
-#			}
-#			exit 1 ;
-#		}
+		
+		mysql_runit($app, $password, $sql, "MySQL error while creating tables") ;
 	}
 	
-	unless ($DEBUG)
+	update_table_versions($app, $settings_href, \%table_versions)
+}
+
+#----------------------------------------------------------------------
+sub update_table_versions
+{
+	my ($app, $settings_href, $latest_versions_href) = @_ ;
+
+	my $table = 'versions' ;
+	my $sql = "" ;
+	foreach my $item (keys %$latest_versions_href)
 	{
-		unlink $temp0 ;
-		unlink $temp1 ;
-		unlink $temp2 if $temp2 ;
-		unlink $temp3 ;
+		$sql .= "UPDATE $settings_href->{DATABASE}.$table SET `version`='$latest_versions_href->{$item}' where `item` = '$item';\n" ;
+	}
+
+	my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+	mysql_runit($app, $password, $sql, "MySQL error while updating table '$table' to set latest versions") ;
+}
+
+
+
+
+
+#----------------------------------------------------------------------
+sub update_table_channels
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	my $table = 'channels' ;
+	if ($existing_version lt '1.01')
+	{
+		my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+		my $sql =<<SQL ;
+ALTER TABLE  $settings_href->{DATABASE}.$table CHANGE  `chan_type` `chan_type` set('tv','radio','hd-tv') NOT NULL DEFAULT 'tv' COMMENT 'TV or Radio' ;
+SQL
+		mysql_runit($app, $password, $sql, "MySQL error while updating table '$table' to version $latest_version") ;
+		
 	}
 }
 
+#----------------------------------------------------------------------
+sub update_table_iplay
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	# no op
+}
+
+#----------------------------------------------------------------------
+sub update_table_listings
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	# no op
+}
+
+#----------------------------------------------------------------------
+sub update_table_multirec
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	my $table = 'multirec' ;
+	if ($existing_version eq '0')
+	{
+		my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+		my $sql =<<SQL ;
+ALTER TABLE  $settings_href->{DATABASE}.$table CHANGE  `adapter`  `adapter` VARCHAR( 16 ) NOT NULL DEFAULT  '0' ;
+SQL
+		mysql_runit($app, $password, $sql, "MySQL error while updating table '$table' to version $latest_version") ;
+		
+	}
+}
+
+#----------------------------------------------------------------------
+sub update_table_record
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	my $table = 'record' ;
+	if ($existing_version eq '0')
+	{
+		my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+		my $sql =<<SQL ;
+ALTER TABLE  $settings_href->{DATABASE}.$table DROP `episode`, DROP `num_episodes`, DROP `adapter` ;
+SQL
+		mysql_try_runit($app, $password, $sql) ;
+		
+	}
+}
+
+#----------------------------------------------------------------------
+sub update_table_recorded
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	my $table = 'recorded' ;
+	if ($existing_version eq '0')
+	{
+		my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+		my $sql =<<SQL ;
+ALTER TABLE  $settings_href->{DATABASE}.$table CHANGE  `adapter`  `adapter` VARCHAR( 16 ) NOT NULL DEFAULT  '0' ;
+SQL
+		mysql_runit($app, $password, $sql, "MySQL error while updating table '$table' to version $latest_version") ;
+		
+	}
+}
+
+#----------------------------------------------------------------------
+sub update_table_schedule
+{
+	my ($app, $settings_href, $existing_version, $latest_version) = @_ ;
+
+	my $table = 'schedule' ;
+	if ($existing_version eq '0')
+	{
+		my $password = $settings_href->{'SQL_ROOT_PASSWORD'} ;
+		my $sql =<<SQL ;
+ALTER TABLE  $settings_href->{DATABASE}.$table CHANGE  `adapter`  `adapter` VARCHAR( 16 ) NOT NULL DEFAULT  '0' ;
+SQL
+		mysql_runit($app, $password, $sql, "MySQL error while updating table '$table' to version $latest_version") ;
+		
+	}
+}
+
+
+
+#======================================================================
+# INSTALL
+#======================================================================
 
 #----------------------------------------------------------------------
 # Directories
@@ -482,6 +625,8 @@ sub template_files
 		$vars{lc $field} = $settings_href->{$field} ;
 	}
 
+$app->prt_data("template_files() : vars=", \%vars) if $DEBUG >= 2 ;
+
 	## read in control file
 	my @templates ;
 	my $line ;
@@ -502,7 +647,8 @@ sub template_files
 				$field =~ s/\s+// ;
 				$field =~ s/^['"](.*)['"]$/$1/ ;
 				
-				$field =~ s/\$(\w+)/$vars{$1}/ge ;
+#				$field =~ s/\$(\w+)/$vars{$1}/ge ;
+				$field =~ s/\$(\w+)/$vars{$1}/g ;
 				
 				push @$aref, $field ;
 			}
@@ -510,6 +656,8 @@ sub template_files
 		}
 	}
 	close $fh ;
+
+$app->prt_data("templates=", \@templates) if $DEBUG >= 2 ;
 	
 	## Process template files	
 	print "Installing template files:\n" ;
@@ -528,7 +676,8 @@ sub template_files
 		close $fh ;
 		
 		# translate
-		$data =~ s/\%([\w_]+)\%/$settings_href->{$1}/ge ;
+#		$data =~ s/\%([\w_]+)\%/$settings_href->{$1}/ge ;
+		$data =~ s/\%([\w_]+)\%/$settings_href->{$1}/g ;
 		
 		# check destination directory
 		my $dir = dirname($dest) ;
@@ -562,6 +711,13 @@ sub start_server
 
 	print "Starting QuartzPVR server ..\n" ;
 	system("/etc/init.d/quartzpvr-server restart") ;
+	
+	print "Setting QuartzPVR server service runlevels ..\n" ;
+	my $rc ;
+	$rc = try_runit($app, "chkconfig quartzpvr-server on") ;
+	print " * Success (chkconfig)\n" if ($rc == 0) ;
+	$rc = try_runit($app, "update-rc.d quartzpvr-server defaults") ;
+	print " * Success (update-rc.d)\n" if ($rc == 0) ;
 }
 
 #----------------------------------------------------------------------
@@ -684,34 +840,16 @@ sub get_config
 		{
 			my ($var, $val) = ($1, $2) ;
 			$val =~ s/\s+$// ;
+			
+			# replace % place-holder with $
+			$val =~ s/%/\$/g ;
+			
 			$settings{$var} = $val ;
 		}
 	}
 	return %settings ;
 }
 
-
-#----------------------------------------------------------------------
-# run command
-#
-sub runit
-{
-	my ($app, $cmd, $errmsg) = @_ ;
-
-	my ($results_aref, $status) = try_runit($app, $cmd) ;
-	
-	if ($status)
-	{
-		print "Error: $errmsg\n" ;
-		foreach (@$results_aref)
-		{
-			print STDERR "$_\n" ;
-		}
-		exit 1 ;
-	}
-	
-	return $results_aref ;
-}
 
 #----------------------------------------------------------------------
 # run command
@@ -746,6 +884,77 @@ if ($DEBUG)
 }
 
 
+
+#----------------------------------------------------------------------
+# run command
+#
+sub runit
+{
+	my ($app, $cmd, $errmsg) = @_ ;
+
+	my ($results_aref, $status) = try_runit($app, $cmd) ;
+	
+	if ($status)
+	{
+		print "Error: $errmsg\n" ;
+		foreach (@$results_aref)
+		{
+			print STDERR "$_\n" ;
+		}
+		exit 1 ;
+	}
+	
+	return $results_aref ;
+}
+
+#----------------------------------------------------------------------
+# run mysql command
+#
+sub mysql_try_runit
+{
+	my ($app, $password, $sql) = @_ ;
+
+print STDERR "Mysql try run cmd: sql=$sql\n" if $DEBUG ;
+
+	my $temp0 = "tmp0-$$.sql" ;
+	open my $fh, ">$temp0" or die "Error: Unable to create temp file : $!" ;
+	print $fh "$sql\n" ;
+	close $fh ;
+
+	my ($results_aref, $status) = try_runit($app,
+		"mysql -uroot -p$password < $temp0"
+	) ;
+	
+	unlink $temp0 ;
+	
+	return wantarray ? ($results_aref, $status) : $status ;
+}
+
+#----------------------------------------------------------------------
+# run mysql command
+#
+sub mysql_runit
+{
+	my ($app, $password, $sql, $errmsg) = @_ ;
+
+print STDERR "Mysql run cmd: sql=$sql\n" if $DEBUG ;
+
+	my $temp0 = "tmp0-$$.sql" ;
+	open my $fh, ">$temp0" or die "Error: Unable to create temp file : $!" ;
+	print $fh "$sql\n" ;
+	close $fh ;
+
+	my $results_aref = runit($app,
+		"mysql -uroot -p$password < $temp0",
+		$errmsg
+	) ;
+	
+	unlink $temp0 ;
+	
+	return $results_aref ;
+}
+
+
 #=================================================================================
 # SETUP
 #=================================================================================
@@ -757,9 +966,17 @@ Installs the Quartz PVR
 
 [OPTIONS]
 
--perl_lib=s		Perl library path
+-perl_lib=s			Perl library path
 
 Set to the Perl library path where the pure perl modules will be installed
+
+-perl_scripts=s		Perl script path
+
+Set to the Perl script path where the perl scripts will be installed
+
+-pm_version=s		Perl module version
+
+Set to the current version of the Perl module 
 
 __DATA__ sql
 
@@ -776,12 +993,12 @@ CREATE TABLE `channels` (
   `channel` varchar(256) NOT NULL COMMENT 'Channel name used by DVB-T',
   `display_name` varchar(256) NOT NULL COMMENT 'Displayed channel name',
   `chan_num` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Channel number',
-  `chan_type` set('tv','radio') NOT NULL DEFAULT 'tv' COMMENT 'TV or Radio',
+  `chan_type` set('tv','radio','hd-tv') NOT NULL DEFAULT 'tv' COMMENT 'TV or Radio',
   `show` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'Whether to show this channel or not',
   `iplay` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Can the channel be recorded using get_iplayer',
   PRIMARY KEY (`chan_num`),
   KEY `type_show_num` (`chan_type`,`show`,`chan_num`)
-) ENGINE=MyISAM AUTO_INCREMENT=729 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -801,7 +1018,7 @@ CREATE TABLE `iplay` (
   `date` date DEFAULT NULL,
   `start` time DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=73 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -845,7 +1062,7 @@ CREATE TABLE `multirec` (
   `date` date DEFAULT '2001-01-00',
   `start` time DEFAULT '00:00:00',
   `duration` time NOT NULL DEFAULT '00:01:00',
-  `adapter` int(11) NOT NULL DEFAULT '0',
+  `adapter` VARCHAR(16) NOT NULL DEFAULT '0',
   KEY `multid` (`multid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -864,10 +1081,7 @@ CREATE TABLE `record` (
   `date` date NOT NULL,
   `start` time NOT NULL,
   `duration` time NOT NULL,
-  `episode` int(11) DEFAULT NULL COMMENT 'OBSOLETE: Remove?',
-  `num_episodes` int(11) DEFAULT NULL COMMENT 'OBSOLETE: Remove?',
   `channel` varchar(128) NOT NULL,
-  `adapter` tinyint(8) NOT NULL DEFAULT '0' COMMENT 'DVB adapter number - OBSOLETE: Remove?',
   `chan_type` varchar(256) DEFAULT 'tv',
   `record` int(11) NOT NULL COMMENT '[0=no record; 1=once; 2=weekly; 3=daily; 4=all(this channel); 5=all, 6=series] + [DVBT=0, FUZZY=0x20 (32), DVBT+IPLAY=0xC0 (192), IPLAY=0xE0 (224)] ',
   `priority` int(11) NOT NULL DEFAULT '50' COMMENT 'Set priority of recording: 1 is highest; 100 is lowest',
@@ -876,7 +1090,7 @@ CREATE TABLE `record` (
   `pathspec` varchar(255) NOT NULL DEFAULT '' COMMENT 'Path specification: varoables are replaced for each recording',
   PRIMARY KEY (`id`),
   KEY `pid` (`pid`)
-) ENGINE=MyISAM AUTO_INCREMENT=606 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -898,7 +1112,7 @@ CREATE TABLE `recorded` (
   `start` time NOT NULL,
   `duration` time NOT NULL,
   `channel` varchar(128) NOT NULL,
-  `adapter` tinyint(8) NOT NULL DEFAULT '0' COMMENT 'DVB adapter number',
+  `adapter` VARCHAR(16) NOT NULL DEFAULT '0' COMMENT 'DVB adapter number',
   `type` enum('tv','radio') NOT NULL DEFAULT 'tv' COMMENT 'Type of recording',
   `record` int(11) NOT NULL COMMENT '[0=no record; 1=once; 2=weekly; 3=daily; 4=all(this channel); 5=all, 6=series] + [DVBT=0, FUZZY=0x20 (32), DVBT+IPLAY=0xC0 (192), IPLAY=0xE0 (224)] ',
   `priority` int(11) NOT NULL COMMENT 'Set priority of recording: 1 is highest; 100 is lowest',
@@ -916,7 +1130,7 @@ CREATE TABLE `recorded` (
   PRIMARY KEY (`id`),
   KEY `pid` (`pid`),
   KEY `pid_rectype` (`pid`,`rectype`)
-) ENGINE=MyISAM AUTO_INCREMENT=606 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -935,12 +1149,23 @@ CREATE TABLE `schedule` (
   `date` date DEFAULT NULL COMMENT 'DEBUG ONLY!',
   `start` time DEFAULT NULL COMMENT 'DEBUG ONLY!',
   `priority` int(11) NOT NULL DEFAULT '10' COMMENT 'Lower numbers are higher priority',
-  `adapter` int(11) NOT NULL DEFAULT '0',
+  `adapter` VARCHAR(16) NOT NULL DEFAULT '0',
   `multid` varchar(128) NOT NULL DEFAULT '0' COMMENT 'ID of multiplex recording group ; 0 = no group',
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=47 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+
+__DATA__ versions.sql
+
+USE `%DATABASE%`;
+
+DROP TABLE IF EXISTS `versions`;
+CREATE TABLE  `versions` (
+`id` INT( 8 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+`item` VARCHAR( 255 ) NOT NULL ,
+`version` VARCHAR( 16 ) NOT NULL
+) ENGINE = MYISAM ;
 
 
 __DATA__ config

@@ -1,5 +1,5 @@
 /*
-Show the latest recorded programs
+Show the list of channels
 */
 
 /*======================================================================================================*/
@@ -109,6 +109,9 @@ ChanSel.prototype.update = function(chansel_data)
 ChanSel.prototype.display_head = function()
 {
 	TitleBar.display_head("Channel Display Selection", "", null, 'ChanSel') ;
+
+	// Add some extra tools
+	TitleBar.addTool("sync", "Update channels", ChanSel.settings.app.updateChanSel) ;
 }
 
 
@@ -198,12 +201,13 @@ ChanSel.prototype.showChanSel = function(heading, idName, gridbox$)
 	
 	var chanRowDiv$ = null ;
 	var col = 0 ;
+	var re = new RegExp(idName) ;
 	for (var idx=0; (idx < len); ++idx )
 	{
 		var chansel = this.list[idx] ;
 		
-		// First check type
-		if (chansel.type != idName)
+		// First check type (match hd-tv & tv with type 'tv')
+		if (chansel.type.search(re) < 0)
 		{
 			continue ;
 		}
@@ -258,14 +262,10 @@ ChanSel.prototype.showChanSel = function(heading, idName, gridbox$)
 				
 				// toggle image
 				var show = (chanSelEntry.show + 1) % 2 ;
-//				chanSelEntry.show = (chanSelEntry.show + 1) % 2 ;
-//				var image = "check-" + chanSelEntry.show ;
-//				thisImg$.attr("src", ChanSel.settings.app.getImage(image)) ;
 				var image = "check-" + show ;
 				thisImg$.attr("src", ChanSel.settings.app.getImage(image)) ;
 				
 				// do Ajax
-//				ChanSel.settings.app.setChanSel(chanSelEntry);
 				ChanSel.settings.app.setChanSel({
 					chanid: chanSelEntry.chanid,
 					show:	show
@@ -284,10 +284,6 @@ ChanSel.prototype.showChanSel = function(heading, idName, gridbox$)
 			col = 0 ;
 		}
 	}
-	
-//		.replaceWith(gridbox$) ;
-//	
-	
 }
 
 

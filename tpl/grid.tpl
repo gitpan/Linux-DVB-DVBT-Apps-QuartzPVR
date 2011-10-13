@@ -5,6 +5,9 @@
 <!-- VERSION 1.001 -->
 
         <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        
+        
         <title>Listings</title>
         <link rel="shortcut icon" href="https://sdprice.plus.com/favicon.ico" type="image/x-icon"> 
 
@@ -163,6 +166,7 @@ document.getElementById("infox").innerHTML = txt ;
         <script language="javascript" src="js/tvguide/Pages/SearchList.js" type="text/javascript"></script>
         <script language="javascript" src="js/tvguide/Pages/Recorded.js" type="text/javascript"></script>
         <script language="javascript" src="js/tvguide/Pages/ChanSel.js" type="text/javascript"></script>
+        <script language="javascript" src="js/tvguide/Pages/Scan.js" type="text/javascript"></script>
         
         <script language="javascript" src="js/tvguide/GridApp.js" type="text/javascript"></script>
  
