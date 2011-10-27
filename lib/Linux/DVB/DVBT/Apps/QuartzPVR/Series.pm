@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.004" ;
+our $VERSION = "1.005" ;
 
 #============================================================================================
 # USES
@@ -198,20 +198,40 @@ sub get_vars
 	$vars{'dir'} = $dir ;
 	
 	## Special case for tva_*
-	$vars{'tva_series_num'} = $vars{'tva_series'} || '' ;
-	$vars{'tva_series_num'} =~ s%/%%g ;
-	$vars{'tva_series'} = '' ;
-	if ($vars{'tva_series_num'})
+	foreach my $field (qw/series prog/)
 	{
-		$vars{'tva_series'} = "Series $vars{'tva_series_num'}" ;
+		$vars{"tva_${field}"} ||= '' ;
+
+		# clear item if it's set to the special marker '-'
+		if ($vars{"tva_${field}"} eq '-')
+		{
+			$vars{"tva_${field}"} = '' ;
+		}
+		
+		$vars{"tva_${field}_num"} = $vars{"tva_${field}"} ;
+		$vars{"tva_${field}_num"} =~ s%/%%g ;
+		$vars{"tva_${field}"} = '' ;
+		if ($vars{"tva_${field}_num"})
+		{
+			$vars{"tva_${field}"} = "Series " . $vars{"tva_${field}_num"} ;
+		}
 	}
 	
-	$vars{'tva_prog_num'} = $vars{'tva_prog'} || '' ;
-	$vars{'tva_prog_num'} =~ s%/%%g ;
-	if ($vars{'tva_prog_num'})
-	{
-		$vars{'tva_prog'} = "Program $vars{'tva_prog_num'}" ;
-	}
+	
+#	$vars{'tva_series_num'} = $vars{'tva_series'} || '' ;
+#	$vars{'tva_series_num'} =~ s%/%%g ;
+#	$vars{'tva_series'} = '' ;
+#	if ($vars{'tva_series_num'})
+#	{
+#		$vars{'tva_series'} = "Series $vars{'tva_series_num'}" ;
+#	}
+#	
+#	$vars{'tva_prog_num'} = $vars{'tva_prog'} || '' ;
+#	$vars{'tva_prog_num'} =~ s%/%%g ;
+#	if ($vars{'tva_prog_num'})
+#	{
+#		$vars{'tva_prog'} = "Program $vars{'tva_prog_num'}" ;
+#	}
 	
 
 $opts_href->{'app'}->prt_data("Series::get_vars() - prog=", $rec_href) if $debug ;
@@ -288,11 +308,15 @@ $opts_href->{'app'}->prt_data("Series::get_vars() - final vars=", \%vars) if $de
 
 #---------------------------------------------------------------------
 # Expand the program's pathspec into a valid path 
+# [Call's cleanpath() to remove invalid chars/spaces]
 sub expand_pathspec
 {
 	my ($rec_href) = @_ ;
 
-	Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "expand_pathspec()") ;
+my $path_debug=$Linux::DVB::DVBT::Apps::QuartzPVR::Path::debug ;
+$Linux::DVB::DVBT::Apps::QuartzPVR::Path::debug = $debug ;
+
+	Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "expand_pathspec($rec_href->{'pathspec'})") ;
 
 	# get pathspec
 	my $pathspec = $rec_href->{'pathspec'} || default_pathspec($rec_href) ;
@@ -313,91 +337,16 @@ $opts_href->{'app'}->prt_data("Series::expand_pathspec($pathspec) - prog=", $rec
 	Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "expand_pathspec() : path=$path") ;
 
 print "Series::expand_pathspec() - path=$path\n" if $debug ;
+
+$Linux::DVB::DVBT::Apps::QuartzPVR::Path::debug = $path_debug ;
 	
 	return $path ; 
 }	
 
 
-##---------------------------------------------------------------------
-## filename including directories EXCLUDING extension
-#sub get_filename
-#{
-#	my ($rec_href) = @_ ;
-#	
-#	my $title = $rec_href->{'title'} ; 
-#	my $datestr = Linux::DVB::DVBT::Apps::QuartzPVR::Time::dt_format($rec_href->{'start_datetime'}, "%Y%m%d%H%M%S") ;			 
-#
-#	## default filename
-##	my $fname = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${title}-${datestr}") ;
-#
-#	my $dir = "" ;
-#	my $file = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}-${title}") ;
-#	my $fname = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}-${title}") ;
-#
-#	Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : title=\"$title\", default=\"$fname\"") ;
-#
-#my $dbg_path = expand_pathspec($rec_href) ;	
-#	
-#	
-#	## Is this a series
-#	if (is_series($rec_href))
-#	{
-#		Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : is a series") ;
-#		
-#		my $subtitle = $rec_href->{'subtitle'} ;
-#		
-#		my $series = $rec_href->{'series'} || tva_text($rec_href->{'tva_series'}) ;
-#		my $episode = $rec_href->{'episode'} ? sprintf "%02d", $rec_href->{'episode'} : "" ;
-#
-#		Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : subtitle=\"$subtitle\", series=\"$series\", episode=\"$episode\"") ;
-#		
-#		if ($subtitle)
-#		{
-#			$episode = "$episode - " if $episode ;
-#
-#			$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise($title). "/" . Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("Series $series") ;
-#			$file = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}-${episode}${subtitle}") ;
-#			$fname = $dir . "/" . $file ;
-#
-#			Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : got subtitle") ;
-#		}
-#		elsif ($episode)
-#		{
-#			$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise($title). "/" . Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("Series $series") ;
-#			$file = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}-episode${episode}") ;
-#			$fname = $dir . "/" . $file ;
-#
-#			Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : got episode") ;
-#		}
-#		else
-#		{
-#			$subtitle ||= tva_text($rec_href->{'tva_prog'}) ;
-#			$subtitle ||= $title ;
-#
-#			$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise($title). "/" . Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("Series $series") ;
-#			if ($subtitle)
-#			{
-#				$file = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}-${subtitle}") ;	
-#			}
-#			else
-#			{
-#				$file = Linux::DVB::DVBT::Apps::QuartzPVR::Path::sanitise("${datestr}") ;
-#			}
-#			
-#			$fname = $dir . "/" . $file ;
-#
-#			Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : not got subtitle or episode : subtitle=\"$subtitle\"") ;
-#		}
-#	}
-#	
-#	Linux::DVB::DVBT::Apps::QuartzPVR::Base::DbgTrace::add_rec($rec_href, "get_filename() : final filename=\"$fname\"") ;
-#	
-#	return wantarray ? ($dir, $file) : $fname ;
-#}
-
-
 #---------------------------------------------------------------------
 # filename including directories
+# [Call's expand_pathspec() -> cleanpath() to remove invalid chars/spaces]
 sub get_filename
 {
 	my ($rec_href) = @_ ;

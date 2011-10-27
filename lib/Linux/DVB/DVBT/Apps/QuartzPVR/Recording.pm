@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.009" ;
+our $VERSION = "1.010" ;
 
 #============================================================================================
 # USES
@@ -466,7 +466,7 @@ $this->prt_data("Found existing rec_href=", $rec_href) if $this->debug ;
 	
 	print " + create new (pri=$priority)\n" if $this->debug ;
 	
-					$rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $recspec_href->{'rec'}, $record_id, $priority) ;
+					$rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $recspec_href->{'rec'}, $record_id, $priority, $recspec_href->{'pth'}) ;
 				}
 			}
 		}
@@ -504,7 +504,7 @@ $this->prt_data("Found existing rec_href=", $rec_href) if $this->debug ;
 
 print " + create fuzzy from existing (pri=$priority)\n" if $this->debug ;
 
-				$rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $recspec_href->{'rec'}, $record_id, $priority) ;
+				$rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $recspec_href->{'rec'}, $record_id, $priority, $recspec_href->{'pth'}) ;
 			}
 			else
 			{
@@ -512,7 +512,7 @@ print " + create fuzzy from existing (pri=$priority)\n" if $this->debug ;
 print " + create new fuzzy\n" if $this->debug ;
 
 				## Can't find any matching recordings - make one up!
-				$rec_href = $this->_create_fuzzy_entry($channel, $fuzzy_title, $recspec_href->{'rec'}, $record_id, $priority) ;
+				$rec_href = $this->_create_fuzzy_entry($channel, $fuzzy_title, $recspec_href->{'rec'}, $record_id, $priority, $recspec_href->{'pth'}) ;
 			}
 		}
 	}
@@ -699,6 +699,7 @@ $this->prt_data("recordings=", $recording_aref) if $this->debug>=10 ;
 		my $record_group = Linux::DVB::DVBT::Apps::QuartzPVR::Base::Constants::record_group($record) ;
 		my $record_id = $rec_href->{'rid'} ;
 		my $priority = $rec_href->{'priority'} ;
+		my $pathspec = $rec_href->{'pathspec'} ;
 
 		my @listings = $this->_process_recording($rec_href) ;
 
@@ -707,7 +708,7 @@ $this->prt_data("recordings=", $recording_aref) if $this->debug>=10 ;
 		{
 			#next unless $listing_href ;
 			
-			my $new_sched_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority) ;
+			my $new_sched_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority, $pathspec) ;
 
 print "New PID : $new_sched_href->{'pid'} $new_sched_href->{'title'} $new_sched_href->{'date'} $new_sched_href->{'start'}\n" if $this->debug ;	
 			
@@ -773,7 +774,7 @@ sub _set_fuzzy_entry
 sub _create_fuzzy_entry
 {
 	my $this = shift ;
-	my ($channel, $fuzzy_title, $record, $record_id, $priority) = @_ ;
+	my ($channel, $fuzzy_title, $record, $record_id, $priority, $pathspec) = @_ ;
 	
 	# TODO: Somehow schedule (or special tag?) so we can put program into a valid
 	# empty slot????
@@ -784,7 +785,7 @@ sub _create_fuzzy_entry
 		'date'		=> $this->tommorrow(),
 	} ;
 	$this->_set_fuzzy_entry($listing_href) ;
-	my $rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority) ;
+	my $rec_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority, $pathspec) ;
 
 	return $rec_href ;
 }
@@ -821,6 +822,7 @@ $this->prt_data("recordings=", $recording_aref) if $this->debug>=10 ;
 		my $record_group = Linux::DVB::DVBT::Apps::QuartzPVR::Base::Constants::record_group($rec_href->{'record'}) ;
 		my $record_id = $rec_href->{'rid'} ;
 		my $priority = $rec_href->{'priority'} ;
+		my $pathspec = $rec_href->{'pathspec'} ;
 
 print " + checking entry RID $record_id ($rec_href->{title} @ $rec_href->{date} $rec_href->{start}) - type=$record_type rec=$record pri=$priority\n" if $this->debug ;	
 $this->prt_data("rec_href=", $rec_href) if $this->debug>=4 ;	
@@ -915,7 +917,7 @@ $this->prt_data(" + + process this : rec_href=", $rec_href) if $this->debug>=4 ;
 		
 
 		## All entries get added in here (also handles updates to 'prog_pid')
-		$this->_add_recordings($record, $record_id, $priority, \@listings, \%pid, \@recording) ;			
+		$this->_add_recordings($record, $record_id, $priority, $pathspec, \@listings, \%pid, \@recording) ;			
 	}
 
 print "== process_iplay_recording() - END ==\n" if $this->debug ;	
@@ -1088,13 +1090,13 @@ print " + Search title=$rec_href->{'title'}\n" if $this->debug>=10 ;
 sub _add_recordings
 {
 	my $this = shift ;
-	my ($record, $record_id, $priority, $listings_aref, $pids_href, $recording_aref) = @_ ;
+	my ($record, $record_id, $priority, $pathspec, $listings_aref, $pids_href, $recording_aref) = @_ ;
 
 
 		# do new entries
 		foreach my $listing_href (@$listings_aref)
 		{
-			my $new_sched_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority) ;
+			my $new_sched_href = Linux::DVB::DVBT::Apps::QuartzPVR::Prog::new_recording($listing_href, $record, $record_id, $priority, $pathspec) ;
 			
 			## New: for IPLAY we have a special 'prog_pid' field that tracks the real PID
 			$new_sched_href->{'prog_pid'} = $listing_href->{'prog_pid'} || $listing_href->{'pid'} ;

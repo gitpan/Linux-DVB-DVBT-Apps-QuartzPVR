@@ -33,7 +33,7 @@ None that I know of!
 use strict ;
 use Carp ;
 
-our $VERSION = "1.008" ;
+our $VERSION = "1.009" ;
 
 #============================================================================================
 # USES
@@ -297,7 +297,7 @@ print " + early : $entry_href->{start_datetime} - $entry_href->{end_datetime} (d
 # Given a listings entry, create a new recording entry
 sub new_recording
 {
-	my ($listing_href, $record, $record_id, $priority) = @_ ;
+	my ($listing_href, $record, $record_id, $priority, $pathspec) = @_ ;
 	my $recording_href = {} ;
 
 	# add 'subtitle' based on main text
@@ -327,7 +327,7 @@ print "new_recording(title=$listing_href->{'title'}, episode=$listing_href->{'ep
 	$recording_href->{'rid'} = $recording_href->{'id'} ; 
 	
 	# Set up default pathspec
-	$recording_href->{'pathspec'} ||= "" ; 
+	$recording_href->{'pathspec'} = $pathspec || "" ; 
 	
 	return $recording_href ;
 }

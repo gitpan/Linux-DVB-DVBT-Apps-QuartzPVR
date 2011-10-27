@@ -18,12 +18,12 @@ use DBI ;
 use DBD::mysql ;
 ## CPAN REQUIRED
 
-use Linux::DVB::DVBT::Ffmpeg ;
+#use Linux::DVB::DVBT::Ffmpeg ;
 use Linux::DVB::DVBT::Config ;
 
 
 # VERSION
-our $VERSION = '5.00' ;
+our $VERSION = '5.03' ;
 
 ## Global
 our $DEBUG = 0 ;
@@ -41,6 +41,8 @@ our $dvb_name ;
 # Default to recording TS (do not transcode)
 our $force_ts = 0 ;
 
+# margin on video length checks (in seconds) - allow for 3 minutes of padding
+our $DURATION_MARGIN = 180 ;
 
 
 	# Create application and run it
@@ -101,9 +103,9 @@ sub app
 	my $config = $opts_href->{'cfg'} ;
 	
 
-	## Add alternate encoder - use vlc
-	unshift @{$Linux::DVB::DVBT::Ffmpeg::COMMANDS{'mpeg'}},
-		'vlc -I dummy "$src" --sout "#standard{mux=ps,dst=\"$dest.$ext\",access=file}" vlc://quit' ;
+#	## Add alternate encoder - use vlc
+#	unshift @{$Linux::DVB::DVBT::Ffmpeg::COMMANDS{'mpeg'}},
+#		'vlc -I dummy "$src" --sout "#standard{mux=ps,dst=\"$dest.$ext\",access=file}" vlc://quit' ;
 
 	$progname = $app->name() ;
 	$dvb_name = "DVB$adap" ;
@@ -136,9 +138,8 @@ Linux::DVB::DVBT::prt_data("Args=", $args_href, "Opts=", $opts_href, "prog args=
 	Linux::DVB::DVBT->dvb_debug($DEBUG) ;
 	Linux::DVB::DVBT->verbose($VERBOSE) ;
 	
-	$Linux::DVB::DVBT::Ffmpeg::DEBUG = $DBG_FFMPEG if $DBG_FFMPEG ;
-	
-	
+#	$Linux::DVB::DVBT::Ffmpeg::DEBUG = $DBG_FFMPEG if $DBG_FFMPEG ;
+
 	## Create dvb (use first found adapter). 
 	## NOTE: With default object settings, the application will
 	## die on *any* error, so there is no error checking in this script
@@ -257,6 +258,21 @@ Linux::DVB::DVBT::prt_data("Args=", $args_href, "Opts=", $opts_href, "prog args=
 
 Linux::DVB::DVBT::prt_data("File Info=", \%file_info) if $DEBUG >= 2 ;
 
+	## Check dirs are available
+	my @dirs = ($trash) ;
+	push @dirs, $rootdir if $rootdir ;
+	foreach my $dir (@dirs)
+	{
+		if (! -d $dir)
+		{
+			if (!mkpath([$dir], 0, 0755))
+			{
+				die_error_mail($mailto, "unable to create dir $dir : $!", $channel, $file, $log) ;
+			}
+		}
+	}
+	
+	
 	
 	## Parse command line
 	my @chan_spec ;
@@ -413,30 +429,22 @@ Linux::DVB::DVBT::prt_data("Post-Record Multiplex info=", \%multiplex_info) if $
 	$error = 1 unless $ok ;
 	
 	
-	## transcode
+	## length check
 	foreach my $file (sort keys %{$multiplex_info{'files'}})
 	{
 		my $multiplex_href = $multiplex_info{'files'}{$file} ;
-
-		info("creating/checking \"$multiplex_href->{destfile}\" ...") ;
-		$error ||= $dvb->multiplex_transcode(%multiplex_info) ; 
+		my $tsfile = $multiplex_href->{'destfile'} ;
+		$multiplex_href->{'srcfile'} = $tsfile ;
 		
-		# transcoding lines
-		foreach my $line (@{$multiplex_href->{'lines'}})
+		info("Checking \"$tsfile\" ...") ;
+		
+		my %info = Linux::DVB::DVBT::TS::info($tsfile) ;
+		my $file_duration = 3600*$info{'duration'}{'hh'} + 60*$info{'duration'}{'mm'} + $info{'duration'}{'ss'} ;
+		if ($file_duration < $multiplex_href->{'duration'} - $DURATION_MARGIN)
 		{
-			info("$line") ;
-		}
-	
-		# warning lines
-		foreach my $line (@{$multiplex_href->{'warnings'}})
-		{
-			info("WARN: $line") ;
-		}
-	
-		# error lines
-		foreach my $line (@{$multiplex_href->{'errors'}})
-		{
-			info("ERROR: $line") ;
+			my $this_error = "Duration of final \"$tsfile\" ($file_duration secs) not as expected ($multiplex_href->{'duration'} secs)" ;
+			info("ERROR: $this_error") ;
+			$error = 1 ;
 		}
 	}
 
@@ -1108,7 +1116,7 @@ Specify Mysql user password
 
 Specify a top-level directory that all recording file paths will be realtive to (or leave blank)
 
--trash=s			Trash directory [default=$DEF_VIDEO_DIR/TRASH]
+-trash=s			Trash directory [default=$DEF_VIDEO_TRASH]
 
 This is where raw transport stream files are moved (rather than being deleted). After recording the transport streams
 are repaired and replaced with the repaired version. The original file is available in this directory just in case the repair 
@@ -1294,35 +1302,6 @@ channel names and the pid value(s) may occur in multiple TSIDs.
 If you define default language or output specs, these will be used in all file definitions unless that file definition
 has it's own output/language spec. For example, if you want all files to include subtitles you can specify it once as
 the default rather than for every file.
-
-The files are recorded as .ts files. If you specify one of the supported file extensions, then the .ts file will be transcoded using the <Linux::DVB::DVBT::Ffmpeg> helper module (which
-requires ffmpeg to be installed). Supported extensions are:
-
-
-=over 4
-
-=item B<.mpeg> - mpeg2 video / audio / subtitles
-
-=item B<.mp4> - mpeg4 video / audio
-
-The mp4 settings are configured to ensure that the file is compatible with playback on the PS3
-(server by Twonky media server).
-
-Note: if you use this then be prepared for a long wait! On my system, a 2 hour film can take 13 hours to transcode.
-
-=item B<.m2v> - mpeg2 video
-
-=item B<.mp2> - mpeg2 audio
-
-=item B<.mp3> - mpeg3 audio
-
-You may notice ffmpeg reports the error:
-
-	lame: output buffer too small
-	
-Apparently (accoriding to the ffmpeg developers) this is perfectly fine. For further details see (http://howto-pages.org/ffmpeg/#basicaudio).
-
-=back
 
 =head2 Further Details
 

@@ -58,6 +58,7 @@ define("MAIL_TO", 		'%MAIL_TO%') ;
 
 define("VIDEO_PATH", 	'%VIDEO_PATH%') ;
 define("AUDIO_PATH", 	'%AUDIO_PATH%') ;
+define("VIDEO_TRASH", 	'%VIDEO_TRASH%') ;
 
 
 #============================================================================================

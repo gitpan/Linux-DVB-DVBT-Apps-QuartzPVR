@@ -694,31 +694,11 @@ sub create_block
 	my $pid = $entry_href->{'pid'} ;
 	$cmd .= " -id $pid" ;
 	
-#$cmd .= " -debug 1";	
-#$cmd .= " -dbg-sql 1";	
-	
-#	# Directory
-#	my $dir = $opts_href->{'video_dir'} ;
-#	if ($type eq 'radio')
-#	{
-#		$dir = $opts_href->{'audio_dir'} ;
-#	}
-#	$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::cleanpath($dir) ;
-	
 	# Channel
 	$cmd .= " '$entry_href->{channel}'" ;
 	
 	# Filename
-	my $recfilename ;
-#	if ($type eq 'radio')
-#	{
-#		$recfilename = "$dir/$fname$opts_href->{audio_ext}" ;
-#	}
-#	else
-#	{
-#		$recfilename = "$dir/$fname$opts_href->{video_ext}" ;
-#	}
-	$recfilename = $fname ;
+	my $recfilename = $fname ;
 	$cmd .= " '$recfilename'" ;
 	
 	# Duration
@@ -731,9 +711,6 @@ sub create_block
 
 	# Log
 	##$cmd .= " >> $opts_href->{log} 2>&1" ;
-#my $dvb = $entry_href->{'adapter'} ;
-#my $date = Linux::DVB::DVBT::Apps::QuartzPVR::Time::dt_format($entry_href->{'start_datetime'}, "%Y%m%d%H%M") ;			 
-#$cmd .= " >> $opts_href->{log_dir}/dvbt-multirec-DVB${dvb}-${date}.log 2>&1" ;
 	$cmd .= " >> $opts_href->{log_dir}/dvbt-record.log 2>&1" ;
 		
 	# Set time
@@ -777,14 +754,7 @@ sub create_iplay_block
 	my $type = $entry_href->{'chan_type'} ;
 	$iplay_cmd .= " --type $type" ;
 
-#	# Directory
-#	my $dir = $opts_href->{'video_dir'} ;
-#	if ($type eq 'radio')
-#	{
-#		$dir = $opts_href->{'audio_dir'} ;
-#	}
-#	$dir .= "/$fdir" if $fdir ;
-#	$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::expand_path($dir) ;
+	# Directory
 	my $dir = $fdir ;
 	$iplay_cmd .= " --output '$dir'" ;
 	
@@ -819,9 +789,6 @@ sub create_iplay_block
 	$cmd = $opts_href->{'iplayprog'} ;
 	$cmd .= " -file $opts_href->{'run_dir'}/$iplay_ctrl_file" ;
 	
-#$cmd .= " -debug 1";	
-#$cmd .= " -dbg-sql 1";	
-
 	# Log
 	$cmd .= " >> $opts_href->{log_dir}/dvbt-iplay.log 2>&1" ;
 		
@@ -884,9 +851,6 @@ sub create_mux_block
 	
 	$cmd .= " -file $opts_href->{'run_dir'}/$rec_file" ;
 
-#$cmd .= " -debug 1";	
-#$cmd .= " -dbg-sql 1";	
-
 	my @rec_contents = () ;
 	push @rec_contents, "## Multiplex $mux_href->{multid} recording list" ;
 	push @rec_contents, "## " ;
@@ -918,26 +882,13 @@ sub create_mux_block
 
 		my $fname = Linux::DVB::DVBT::Apps::QuartzPVR::Series::get_filename($entry_href) ;
 		
-#		# Extension
-#		my $ext = "ts" ;
-		
 		# channel type
 		my $type = $entry_href->{'chan_type'} ;
 	
-#		# Directory
-#		my $dir = $opts_href->{'video_dir'} ;
-#		if ($type eq 'radio')
-#		{
-#			$dir = $opts_href->{'audio_dir'} ;
-#			$ext = "mp3" ;
-#		}
-#		$dir = Linux::DVB::DVBT::Apps::QuartzPVR::Path::cleanpath($dir) ;
-
 		# Channel
 		$entry .= " '$entry_href->{channel}'" ;
 		
 		# Filename
-#		my $recfilename = "$dir/$fname.$ext" ;
 		my $recfilename = $fname ;
 		$entry .= " '$recfilename'" ;
 		
@@ -985,9 +936,6 @@ sub create_mux_block
 
 	# Log
 	##$cmd .= " >> $opts_href->{log} 2>&1" ;
-#my $dvb = $mux_href->{'adapter'} ;
-#my $date = Linux::DVB::DVBT::Apps::QuartzPVR::Time::dt_format($mux_href->{'start_datetime'}, "%Y%m%d%H%M") ;			 
-#$cmd .= " >> $opts_href->{log_dir}/dvbt-multirec-DVB${dvb}-${date}.log 2>&1" ;
 	$cmd .= " >> $opts_href->{log_dir}/dvbt-record.log 2>&1" ;
 		
 

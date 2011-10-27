@@ -66,12 +66,13 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::Config::PHP::Install ;
 #============================================================================================
 # GLOBALS
 #============================================================================================
-our $VERSION = '2.001' ;
+our $VERSION = '2.003' ;
 
 
 our $DEBUG = 0 ;
 our $VERBOSE = 0 ;
 
+our $PHP_INCLUDE_EXISTING = '%PHP_SEARCH%' ;
 
 our @PHP_INC ;
 our %PHP_INC ;
@@ -410,11 +411,21 @@ use strict ;
 BEGIN
 {
 	## Create include path for PHP files ##
-	my @PHP_INI_LIST = qw(/etc/php5/apache2/php.ini /etc/php5/php.ini /etc/php.ini) ;
+	my @PHP_INI_LIST = () ;
+	if ($PHP_INCLUDE_EXISTING)
+	{
+		# Allow the inclusion of other existing PHP libraries (NOTE: This may cause name clashes)
+		@PHP_INI_LIST = qw(/etc/php5/apache2/php.ini /etc/php5/php.ini /etc/php.ini) ;
+	}
+	
 	if ($^O =~ /mswin/i)
 	{
+		# Special debug variant when running XAMP on Windows (default location)
 		push @PHP_INI_LIST, "C:/xampp/php/php.ini" ;
 	}
+	
+	
+	## Look for the php.ini file to use ##
 	my $PHP_INI ;
 	while (!$PHP_INI && @PHP_INI_LIST)
 	{
@@ -424,12 +435,10 @@ BEGIN
 			$PHP_INI = $f ;
 		}
 	}
-#	die "Error: Unable to locate php.ini" unless $PHP_INI || ($^O =~ /mswin/i);
-#	print "Warning: Unable to locate php.ini\n" if  !$PHP_INI && ($^O =~ /mswin/i);
 #
 	my %php_paths ;
 
-	# Start with parsing the php.ini file
+	## Start with parsing the php.ini file (if found) ##
 	if ($PHP_INI)
 	{
 		if (open my $phpini, "<$PHP_INI") 

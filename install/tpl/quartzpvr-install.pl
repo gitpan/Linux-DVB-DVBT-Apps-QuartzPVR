@@ -23,7 +23,7 @@ our %table_versions = (
 
 
 # VERSION
-our $VERSION = '2.00' ;
+our $VERSION = '2.03' ;
 our $DEBUG = 0 ;
 
 	# Create application and run it
@@ -78,7 +78,6 @@ $app->prt_data("Settings", \%settings) if $DEBUG ;
 		['css',		$webowner, 0644],
 		['js',		$webowner, 0644],
 		['php',		$webowner, 0644],
-#		['scripts',	$pvrowner, 0755],
 		['tpl',		$webowner, 0644],
 	) ;
 	install_files($app, \%settings, \@dirs) ;
@@ -117,6 +116,8 @@ sub create_pvr_user
 	my $user = $settings_href->{'PVR_USER'} ;
 	my $group = $settings_href->{'PVR_GROUP'} ;
 	my $home = $settings_href->{'PVR_HOME'} ;
+	my $perl_scripts = $settings_href->{'PERL_SCRIPTS'} ;
+	my $logdir = $settings_href->{'PVR_LOGDIR'} ;
 	
 #	my $uid = getpwnam($user) ; 
 	my ($uname, $upasswd, $uid, $ugid, $quota,
@@ -169,51 +170,101 @@ print "NOW group=$group : name=$gname gid=$gid members='$members'\n" if $DEBUG ;
 			) ;
 		}
 	}
-	
+
 	## Ensure crontab is initialised
+	my $crontag = "@[dvbt-update]" ;
+	my %blocks = (
+		"# $crontag Update the EPG" => {
+				-active		=> 1,
+				-minute 	=> 7,
+				-hour	 	=> 4,
+				-dow	 	=> "*",
+				-month	 	=> "*",
+				-dom	 	=> "*",
+				-command	=> "$perl_scripts/dvbt-epg-sql >> $logdir/dvbt_epg.log 2>&1",
+		},
+		"# $crontag Update the scheduled programs" => {
+				-active		=> 1,
+				-minute 	=> 7,
+				-hour	 	=> 6,
+				-dow	 	=> "*",
+				-month	 	=> "*",
+				-dom	 	=> "*",
+				-command	=> "$perl_scripts/dvbt-record-mgr -dbg-trace all -report 1 >> $logdir/dvb_record_mgr.log 2>&1",
+		},
+		"# $crontag Clean out trash" => {
+				-active		=> 1,
+				-minute 	=> 0,
+				-hour	 	=> 0,
+				-dow	 	=> "*",
+				-month	 	=> "*",
+				-dom	 	=> "*",
+				-command	=> "find $settings_href->{VIDEO_TRASH} -mtime +7|xargs -i rm -rf '{}' 2>&1",
+		},
+	
+	) ;
+
+	my $crontag_re = $crontag ;
+	$crontag_re =~ s/([\[\@\-])/\\$1/g ;
+
 	my $ct = new Config::Crontab( -owner => $user );
 	$ct->read() ;
 	my @dvbt_blocks = $ct->select(
 								-type		=> 'comment',
-								-data_re	=> '\@\[dvbt\-update\]' 
+								-data_re	=> $crontag_re, 
 								) ;
 								
 Linux::DVB::DVBT::prt_data("dvbt_blocks=", \@dvbt_blocks) if $DEBUG ;
 
-	if (!@dvbt_blocks)
+	if (@dvbt_blocks)
+	{
+		foreach my $block ($ct->blocks)
+		{
+			my $tag = "" ;
+			foreach my $comment ($block->select(-type => 'comment'))
+			{
+				$tag = $comment->data() ;
+			}
+			if ($tag)
+			{
+				next if $tag !~ /$crontag_re/ ;
+				foreach my $event ($block->select(-type => 'event'))
+				{
+					foreach my $field (qw/minute hour dom month dow/)
+					{
+						$blocks{$tag} ||= {} ;
+						$blocks{$tag}{"-$field"} = $event->$field() ;
+					}
+				}
+		
+				## Remove existing block
+				$ct->remove($block) ;
+			}			
+		}
+	}
+
+Linux::DVB::DVBT::prt_data("Blocks=", \%blocks) if $DEBUG ;
+
+	foreach my $comment (keys %blocks)
 	{
 		## Add block to crontab
 		my $block = new Config::Crontab::Block ;
-		$block->last(new Config::Crontab::Comment("# @[dvbt-update] Update the EPG")) ;
-		$block->last(new Config::Crontab::Event(
-				-active		=> 1,
-				-minute 	=> 7,
-				-hour	 	=> 4,
-				-command	=> "dvbt-epg-sql >> $settings_href->{'PVR_LOGDIR'}/dvbt_epg.log 2>&1",
-		)) ;
-		$ct->last($block) ;
+		$block->last(new Config::Crontab::Comment($comment)) ;
+		$block->last(new Config::Crontab::Event(%{ $blocks{$comment} })) ;
 
-		## Add block to crontab
-		$block = new Config::Crontab::Block ;
-		$block->last(new Config::Crontab::Comment("# @[dvbt-update] Update the scheduled programs")) ;
-		$block->last(new Config::Crontab::Event(
-				-active		=> 1,
-				-minute 	=> 7,
-				-hour	 	=> 6,
-				-command	=> "dvbt-record-mgr -dbg-trace all -report 1 >> $settings_href->{'PVR_LOGDIR'}/dvb_record_mgr.log 2>&1",
-		)) ;
-		
-		$ct->last($block) ;
-		
-		## Write crontab
-		$ct->write()    
-		  or do {
-	        warn "Error: " . $ct->error . "\n";
-	      };
+		$ct->first($block) ;
 
-		print " * Written crontab\n" ;	      
-	      
 	}
+	## Write crontab
+	$ct->write()    
+	  or do {
+        warn "Error: " . $ct->error . "\n";
+      };
+
+	print " * Written crontab\n" ;	      
+
+
+
 	
 	## Clear out any previous logs
 	foreach my $log (glob("$home/*.log"))
@@ -513,6 +564,8 @@ sub create_dirs
 {
 	my ($app, $settings_href) = @_ ;
 	
+	print "Creating directories:\n" ;
+
 	my $web_uid = getpwnam($settings_href->{'WEB_USER'}) ;
 	my $web_gid = getgrnam($settings_href->{'WEB_GROUP'}) ;
 	
@@ -522,31 +575,66 @@ sub create_dirs
 	## Web
 	foreach my $d (qw/PVR_ROOT/)
 	{
-		if (! -d $settings_href->{$d})
+		my $dir = $settings_href->{$d} ;
+		if (! -d $dir)
 		{
-			mkdir $settings_href->{$d} ;
-			chmod 0755, $settings_href->{$d} ;
-			chown $web_uid, $web_gid, $settings_href->{$d} ;
+			print " * $dir .. ($settings_href->{'WEB_USER'}:$settings_href->{'WEB_GROUP'})\n" ;
+			if (!mkpath([$dir], 0, 0755))
+			{
+				print "ERROR unable to create dir $dir : $!" ;
+				exit 1 ;
+			}
+			chown $web_uid, $web_gid, $dir ;
 		}
 	}
 	
 	## PVR
-	foreach my $d (qw/VIDEO_DIR AUDIO_DIR PVR_LOGDIR PVR_HOME/)
+	foreach my $d (qw/VIDEO_DIR VIDEO_TRASH AUDIO_DIR PVR_LOGDIR PVR_HOME/)
 	{
-		if (! -d $settings_href->{$d})
+		my $dir = $settings_href->{$d} ;
+		if (! -d $dir)
 		{
-			mkdir $settings_href->{$d} ;
-			chmod 0755, $settings_href->{$d} ;
-			chown $pvr_uid, $pvr_gid, $settings_href->{$d} ;
+			print " * $dir .. ($settings_href->{'PVR_USER'}:$settings_href->{'PVR_GROUP'})\n" ;
+			if (!mkpath([$dir], 0, 0755))
+			{
+				print "ERROR unable to create dir $dir : $!" ;
+				exit 1 ;
+			}
+			chown $pvr_uid, $pvr_gid, $dir ;
 		}
 	}
 
+#	## Subdirs
+#	my $dir = "VIDEO_DIR" ;
+#	foreach my $d (qw/TRASH/)
+#	{
+#		my $dir = "$settings_href->{$dir}/$d" ;
+#		if (! -d $dir)
+#		{
+#			print " * $dir .. ($settings_href->{'PVR_USER'}:$settings_href->{'PVR_GROUP'})\n" ;
+#			if (!mkpath([$dir], 0, 0755))
+#			{
+#				print "ERROR unable to create dir $dir : $!" ;
+#				exit 1 ;
+#			}
+#			chown $pvr_uid, $pvr_gid, $dir ;
+#		}
+#		
+#	}
+
 	# pvr server
-	foreach my $d (qw%/var/run/quartzpvr%)
+	foreach my $dir (qw%/var/run/quartzpvr%)
 	{
-		mkdir $d ;
-		chmod 0755, $d ;
-		chown $pvr_uid, $pvr_gid, $d ;
+		if (! -d $dir)
+		{
+			print " * $dir .. ($settings_href->{'PVR_USER'}:$settings_href->{'PVR_GROUP'})\n" ;
+			if (!mkpath([$dir], 0, 0755))
+			{
+				print "ERROR unable to create dir $dir : $!" ;
+				exit 1 ;
+			}
+			chown $pvr_uid, $pvr_gid, $dir ;
+		}
 	}
 }
 
@@ -614,6 +702,9 @@ sub template_files
 	my ($app, $settings_href, $template_file) = @_ ;
 	
 	my %vars = (%$settings_href) ;
+	
+	$vars{'uid'} = $< ;
+	$vars{'gid'} = $( ;
 	
 	$vars{'web_uid'} = getpwnam($settings_href->{'WEB_USER'}) ; 
 	$vars{'web_gid'} = getgrnam($settings_href->{'WEB_GROUP'}) ;
@@ -1169,4 +1260,3 @@ CREATE TABLE  `versions` (
 
 
 __DATA__ config
-

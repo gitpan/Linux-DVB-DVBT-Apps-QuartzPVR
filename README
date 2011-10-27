@@ -26,25 +26,33 @@ and database used for the tv guide.
 
 * DVBT_FREQFILE - full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)
 
-Give the path to the frequency file. This is used by dvbt-scan to initialise the tuner.
+Give the path to the frequency file. This is used by dvbt-scan to initialise the tuner. Can alternatively supply
+a 2 letter country code (for example GB) to initiatate a (much longer) full frequency scan.
 
 * MAIL_TO - email account to mail PVR errors to
 
 Give a mail account (e.g. fred@bloggs) to which all script errors will be sent. This is useful for cases where a 
 program has failed to record. 
 
+* WEB_USER - user name of the web server
+
+User name that your web server uses (e.g. on Ubuntu this is www-data). Script should have worked out the correct
+setting, but change if it's not correct for your system.
+
+* WEB_GROUP - group name of the web server
+
+Group name that your web server uses (e.g. on Ubuntu this is www-data). Script should have worked out the correct
+setting, but change if it's not correct for your system.
+
+The script then asks if you want to use the default values for the "extra" options. These defaults will work on any 
+system, but you may answer 'no' to allow you chance to see and change all of the following settings:
+
+
+
 * SERVER_PORT - TCP port of the new PVR server that I will install
 
 Specify a different TCP port number for the PVR server to use. The server provides the interface between the scheduling
 Perl script and the web frontend 
-
-* WEB_USER - user name of the web server
-
-User name that your web server uses (e.g. on Ubuntu this is www-data)
-
-* WEB_GROUP - group name of the web server
-
-Group name that your web server uses (e.g. on Ubuntu this is www-data)
 
 * SQL_USER - username of the MySQL pvr database owner
 
@@ -79,10 +87,127 @@ The directory under which all videos are recorded
 
 The directory under which all audio files are recorded
 
+* VIDEO_TRASH - Video trashcan directory
+
+During recording, various temporary video files are created and then removed. By default the "deleted" files are moved
+to this trashcan location. A cron job is set up in the QUARTZPVR user's crontab which deletes trash files after a week.
+
+This is done to ensure you always have access to the raw recording just in case the file left in the video directory
+is not playable (allows for re-processing the original).
+
+* VIDEO_PATH - Video file full path
+
+Recorded video file will be stored with this full pathname. Obviously the filename must contain variables otherwise every
+recording will overwrite the previous recording.
+
+The default setting is: $video_dir/$title/$tva_series/$YmdHMS-$name.ts
+
+The full list of variable that can be used are:
+
+
+	$Y
+	Four digit year (e.g. 2011) of recording start date.
+	
+	$m
+	Two digit month with leading zero of recording start date.
+	
+	$d
+	Two digit day with leading zero of recording start date.
+	
+	$H
+	Two digit hour with leading zero of recording start time.
+	
+	$M
+	Two digit minute with leading zero of recording start time.
+	
+	$S
+	Two digit second with leading zero of recording start time.
+	
+	$Ymd
+	Shortcut to using Y, m, d variables individually (e.g. results in 20110901 for September 1st, 2011)
+	
+	$HMS
+	Shortcut to using H, M, S variables individually (e.g. results in 173500 for 17:35:00)
+	
+	$Ymd
+	Shortcut to using Y, m, d, H, M, S variables individually (e.g. results in 20110901173500 for September 1st, 2011 at 17:35:00)
+	
+	$genre
+	Broadcast genre string. This is usually not much use as it only conveys 'Film', 'Show', or 'News'.
+	
+	$series
+	If the program is part of a series, then this variable is set to 'Series X'.
+	
+	$series_num
+	If the program is part of a series, then this variable is set to the series number e.g. 'X'.
+	
+	$episode
+	If the program is part of a series, then this variable is set to 'Episode Y'.
+	
+	$episode_num
+	If the program is part of a series, then this variable is set to the episode number e.g. 'Y'.
+	
+	$tva_series
+	Set to the TVAnytime series string (f present).
+	
+	$tva_prog
+	Set to the TVAnytime program string (f present).
+	
+	$title
+	Set to the program title (e.g. 'The Big Bang Theory').
+	
+	$subtitle
+	This is the "minor title" or extra details string extracted from the program description.
+	
+	$name
+	Set to a meaningful name for the program. Default is to the use the title.
+	
+	$audio_dir
+	Set to the top-level path for recording all audio files. This is initialised when the application is installed.
+	
+	$video_dir
+	Set to the top-level path for recording all video files. This is initialised when the application is installed.
+	
+	$dir
+	Automatically set to video_dir or audio_dir depending on the file type.
+	
+
+* AUDIO_PATH - Audio file full path
+
+Recorded audio file will be stored with this full pathname. 
+
+The default setting is: $audio_dir/$title/$series/$YmdHMS-$name.mp3
+
 * PVR_ROOT - Installation directory. This is where all of the PVR software is installed.
 
 This is where the web frontend files (PHP, CSS, Javascript) are installed. You will need to add an entry to your 
 web server configuration to allow access to this directory (and it is up to you to protect site access).
+
+* ADAPTERS - DVB-T/T2 adapters to be used
+
+Space separated list of the adapter numbers to use (leave blank for default)
+
+* ADSKIP - Advert removal
+
+Advert removal (1=remove adverts, 0=do not remove adverts)
+
+* DATE_TZ - Timezone
+Your timezone (as defined for the PHP Date object)
+
+* PHP_SEARCH - Include all PHP libs
+
+Allow use of other installed PHP (may cause name clashes). 
+
+* PHP_LOG - PHP log file
+
+Debug: Log file to use for PHP application. Default is no log file specified so no logging is done. 
+
+Note: You are responsible for ensuring the directory is writable by the web server.
+
+* SERVER_DEBUG - QuartzPVR server debugging
+
+Debug: Level of server debug logging. Debug logs will be stored in /var/log/quartzpvr-server.log
+
 
 
 UBUNTU

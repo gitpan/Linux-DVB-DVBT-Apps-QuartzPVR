@@ -16,6 +16,257 @@ Linux::DVB::DVBT::Apps::QuartzPVR - PVR Application
 This is a bundle module that installs a complete PVR application that uses a web frontend for 
 TV listings display and for managing recordings.
 
+
+=head2 INSTALLING
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+=head2 INSTALL QUESTIONS
+
+When you run 'perl Makefile.PL' a number of questions are asked to determine your setup. The answers are then 
+embedded into various config files in the installation.
+
+Questions asked are:
+
+=over 4
+
+=item * SQL_ROOT_PASSWORD - MySQL root user password so I can create the pvr database
+
+The root user password for your MySQL server. This allows the installation to create the new MySQL user
+and database used for the tv guide. 
+
+=item * DVBT_FREQFILE - full path to DVB-T tuning frequency file (usually under /usr/share/dvb/dvb-t)
+
+Give the path to the frequency file. This is used by dvbt-scan to initialise the tuner. Can alternatively supply
+a 2 letter country code (for example GB) to initiatate a (much longer) full frequency scan.
+
+=item * MAIL_TO - email account to mail PVR errors to
+
+Give a mail account (e.g. fred@bloggs) to which all script errors will be sent. This is useful for cases where a 
+program has failed to record. 
+
+=item * WEB_USER - user name of the web server
+
+User name that your web server uses (e.g. on Ubuntu this is www-data). Script should have worked out the correct
+setting, but change if it's not correct for your system.
+
+=item * WEB_GROUP - group name of the web server
+
+Group name that your web server uses (e.g. on Ubuntu this is www-data). Script should have worked out the correct
+setting, but change if it's not correct for your system.
+
+=back
+
+The script then asks if you want to use the default values for the "extra" options. These defaults will work on any 
+system, but you may answer 'no' to allow you chance to see and change all of the following settings:
+
+=over 4
+
+=item * SERVER_PORT - TCP port of the new PVR server that I will install
+
+Specify a different TCP port number for the PVR server to use. The server provides the interface between the scheduling
+Perl script and the web frontend 
+
+=item * SQL_USER - username of the MySQL pvr database owner
+
+Change the MySQL username that will be created for the tv guide database
+
+=item * SQL_PASSWORD - password of the MySQL pvr database owner
+
+Change the MySQL password that will be used for the tv guide database
+
+=item * PVR_USER - Linux user name created for recording
+
+Specify a username to use for running the recording scripts. By default a new system user will be created, but you can
+also specify an existing user. Note that recordings are added to that user's crontab
+
+=item * PVR_GROUP - Linux group name for PVR_USER
+
+Specify a group to use for running the recording scripts. By default uses 'video' to allow access to the DVB-T drivers.
+
+=item * PVR_LOGDIR - location of PVR logs
+
+A directory under which all PVR logs are stored
+
+=item * DATABASE - PVR database name
+
+The MySQL database name to use for the tv guide
+
+=item * VIDEO_DIR - Video recording top-level directory
+
+The directory under which all videos are recorded
+
+=item * AUDIO_DIR - Audio recording top-level directory
+
+The directory under which all audio files are recorded
+
+=item * VIDEO_TRASH - Video trashcan directory
+
+During recording, various temporary video files are created and then removed. By default the "deleted" files are moved
+to this trashcan location. A cron job is set up in the QUARTZPVR user's crontab which deletes trash files after a week.
+
+This is done to ensure you always have access to the raw recording just in case the file left in the video directory
+is not playable (allows for re-processing the original).
+
+=item * VIDEO_PATH - Video file full path
+
+Recorded video file will be stored with this full pathname. Obviously the filename must contain variables otherwise every
+recording will overwrite the previous recording.
+
+The default setting is: $video_dir/$title/$tva_series/$YmdHMS-$name.ts
+
+The full list of variable that can be used are:
+
+=over 4
+
+=item $Y
+Four digit year (e.g. 2011) of recording start date.
+
+=item $m
+Two digit month with leading zero of recording start date.
+
+=item $d
+Two digit day with leading zero of recording start date.
+
+=item $H
+Two digit hour with leading zero of recording start time.
+
+=item $M
+Two digit minute with leading zero of recording start time.
+
+=item $S
+Two digit second with leading zero of recording start time.
+
+=item $Ymd
+Shortcut to using Y, m, d variables individually (e.g. results in 20110901 for September 1st, 2011)
+
+=item $HMS
+Shortcut to using H, M, S variables individually (e.g. results in 173500 for 17:35:00)
+
+=item $Ymd
+Shortcut to using Y, m, d, H, M, S variables individually (e.g. results in 20110901173500 for September 1st, 2011 at 17:35:00)
+
+=item $genre
+Broadcast genre string. This is usually not much use as it only conveys 'Film', 'Show', or 'News'.
+
+=item $series
+If the program is part of a series, then this variable is set to 'Series X'.
+
+=item $series_num
+If the program is part of a series, then this variable is set to the series number e.g. 'X'.
+
+=item $episode
+If the program is part of a series, then this variable is set to 'Episode Y'.
+
+=item $episode_num
+If the program is part of a series, then this variable is set to the episode number e.g. 'Y'.
+
+=item $tva_series
+Set to the TVAnytime series string (f present).
+
+=item $tva_prog
+Set to the TVAnytime program string (f present).
+
+=item $title
+Set to the program title (e.g. 'The Big Bang Theory').
+
+=item $subtitle
+This is the "minor title" or extra details string extracted from the program description.
+
+=item $name
+Set to a meaningful name for the program. Default is to the use the title.
+
+=item $audio_dir
+Set to the top-level path for recording all audio files. This is initialised when the application is installed.
+
+=item $video_dir
+Set to the top-level path for recording all video files. This is initialised when the application is installed.
+
+=item $dir
+Automatically set to video_dir or audio_dir depending on the file type.
+
+=back
+
+
+
+=item * AUDIO_PATH - Audio file full path
+
+Recorded audio file will be stored with this full pathname. 
+
+The default setting is: $audio_dir/$title/$series/$YmdHMS-$name.mp3
+
+=item * PVR_ROOT - Installation directory. This is where all of the PVR software is installed.
+
+This is where the web frontend files (PHP, CSS, Javascript) are installed. You will need to add an entry to your 
+web server configuration to allow access to this directory (and it is up to you to protect site access).
+
+=item * ADAPTERS - DVB-T/T2 adapters to be used
+
+Space separated list of the adapter numbers to use (leave blank for default)
+
+=item * ADSKIP - Advert removal
+
+Advert removal (1=remove adverts, 0=do not remove adverts)
+
+=item * DATE_TZ - Timezone
+Your timezone (as defined for the PHP Date object)
+
+=item * PHP_SEARCH - Include all PHP libs
+
+Allow use of other installed PHP (may cause name clashes). 
+
+=item * PHP_LOG - PHP log file
+
+Debug: Log file to use for PHP application. Default is no log file specified so no logging is done. 
+
+Note: You are responsible for ensuring the directory is writable by the web server.
+
+=item * SERVER_DEBUG - QuartzPVR server debugging
+
+Debug: Level of server debug logging. Debug logs will be stored in /var/log/quartzpvr-server.log
+
+=back
+
+=head2 UBUNTU
+
+If you haven't already got DBD::mysql, then you may need to install libmysqlclient-dev package for the cpan install
+to work properly (it needs mysql_config). Run:
+
+	sudo apt-get install libmysqlclient-dev
+
+=head2 DEPENDENCIES
+
+To run the web frontend you need to have installed:
+
+	web server (preferably apache)
+	php
+	MySql
+	a dvb package (to provide the initial frequency file)
+
+This module requires these other modules and libraries:
+
+	use App::Framework ;
+	use Linux::DVB::DVBT ;
+	use Linux::DVB::DVBT::TS ;
+	use Linux::DVB::DVBT::Advert ;
+	use MP3::Tag ;
+	use DBI ;
+	use DBD::mysql ;
+	use Net::Server::Fork ;
+
+
+=head2 OPTIONAL
+
+If you have access to the BBC iplayer, you can schedule iplayer file downloads via the EPG. To do this you need
+to install get_iplayer from http://www.infradead.org/get_iplayer/html/get_iplayer.html
+
+
+
 =over 4
 
 =cut
@@ -44,7 +295,7 @@ use Linux::DVB::DVBT::Apps::QuartzPVR::DVB ;
 #============================================================================================
 # GLOBALS
 #============================================================================================
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 
 #============================================================================================
@@ -130,19 +381,19 @@ my %FIELDS = (
 # CONSTRUCTOR 
 #============================================================================================
 
-=item C<new([%args])>
-
-Create a new object.
-
-The %args are specified as they would be in the B<set> method, for example:
-
-	'mmap_handler' => $mmap_handler
-
-The full list of possible arguments are :
-
-	'fields'	=> Either ARRAY list of valid field names, or HASH of field names with default values 
-
-=cut
+#=item C<new([%args])>
+#
+#Create a new object.
+#
+#The %args are specified as they would be in the B<set> method, for example:
+#
+#	'mmap_handler' => $mmap_handler
+#
+#The full list of possible arguments are :
+#
+#	'fields'	=> Either ARRAY list of valid field names, or HASH of field names with default values 
+#
+#=cut
 
 sub new
 {
@@ -296,14 +547,14 @@ sub new
 #============================================================================================
 
 #-----------------------------------------------------------------------------
-
-=item C<init_class([%args])>
-
-Initialises the Cwrsync object class variables. Creates a class instance so that these
-methods can also be called via the class (don't need a specific instance)
-
-=cut
-
+#
+#=item C<init_class([%args])>
+#
+#Initialises the Cwrsync object class variables. Creates a class instance so that these
+#methods can also be called via the class (don't need a specific instance)
+#
+#=cut
+#
 sub init_class
 {
 	my $class = shift ;

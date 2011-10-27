@@ -1,4 +1,3 @@
-#use 5.008008;
 use 5.006;
 use ExtUtils::MakeMaker qw(prompt WriteMakefile);
 use Config;
@@ -300,6 +299,50 @@ sub webserver_info
 }
 
 #----------------------------------------------------------------------
+sub _get_settings
+{
+	my ($settings_href, $settings_def, $get_val) = @_ ;
+
+	foreach my $aref (@$settings_def)
+	{
+		my ($var, $null_valid, $default, $desc) = @$aref ;
+#		print "Default=$default\n" ;
+
+		## Amend defaults with existing settings
+		if ($settings_href->{$var})
+		{
+			$default = $settings_href->{$var} ;
+		}
+		my $val = "$default" ;
+		
+		my $prefix = "" ;
+		if ($desc =~ s/^\s*Debug:\s*//i)
+		{
+			$prefix = " [DEBUG]" ;
+		}
+		
+		if ($get_val)
+		{
+			do
+			{
+				print "$var:$prefix Please enter the $desc [$val]: " ;
+				my $ans = <STDIN> ;
+				chomp $ans ;
+				if ($ans)
+				{
+					$val = $ans ;
+				}
+			
+			} while (!length($val) && !$null_valid) ;
+		}
+		
+		# ensure settings are set to either user-supplied value or default
+		$settings_href->{$var} = $val ;
+	}
+}
+
+
+#----------------------------------------------------------------------
 sub get_settings
 {
 	my ($settings_href) = @_ ;
@@ -314,6 +357,8 @@ sub get_settings
 [ "WEB_GROUP", 			0,				$settings_href->{'WEB_GROUP'},				"group name of the web server"],
 	) ;
 
+	my $pvr_top = "/var/lib/quartzpvr" ;
+	
 	## List of settings that can be left to their default values
 	my @extra_settings = (
 # var					can be null?	default										description
@@ -324,14 +369,16 @@ sub get_settings
 [ "PVR_GROUP", 			0,				"video",									"Linux group name for PVR_USER"],
 [ "PVR_LOGDIR", 		0,				"/var/log/quartzpvr",						"location of PVR logs"],
 [ "DATABASE", 			0,				"quartzpvr",								"PVR database name"],
-[ "VIDEO_DIR", 			0,				"/var/lib/quartzpvr/video",					"Video recording top-level directory"],
-[ "AUDIO_DIR", 			0,				"/var/lib/quartzpvr/audio",					"Audio recording top-level directory"],
+[ "VIDEO_DIR", 			0,				"$pvr_top/video",							"Video recording top-level directory"],
+[ "AUDIO_DIR", 			0,				"$pvr_top/audio",							"Audio recording top-level directory"],
+[ "VIDEO_TRASH",		0,				"$pvr_top/video/.TRASH",					"Video temporary files directory"],
 [ "VIDEO_PATH",			0,				"\$video_dir/\$title/\$tva_series/\$YmdHMS-\$name.ts",	"Video recording filename specification"],
 [ "AUDIO_PATH",			0,				"\$audio_dir/\$title/\$series/\$YmdHMS-\$name.mp3",	"Audio recording filename specification"],
 [ "PVR_ROOT", 			0,				"$settings_href->{'WEB_ROOT'}/quartzpvr", 	"Installation directory. This is where all of the PVR software is installed."],
 [ "ADAPTERS", 			1,				"", 										"Space separated list of the adapter numbers to use (leave blank for default)"],
 [ "ADSKIP", 			0,				"1", 										"Advert removal (1=remove adverts, 0=do not remove adverts)"],
 [ "DATE_TZ", 			0,				"Europe/London",							"Your timezone (as defined for the PHP Date object)"],
+[ "PHP_SEARCH",			0,				"0",										"Allow use of other installed PHP (may cause name clashes)"],
 [ "PHP_LOG", 			1,				"", 										"Debug: Log file to use for PHP application"],
 [ "SERVER_DEBUG",		0,				"1", 										"Debug: Level of server debug logging"],
 	) ;
@@ -344,32 +391,7 @@ sub get_settings
 	
 	 
 	## get any new settings
-	foreach my $aref (@settings)
-	{
-		my ($var, $null_valid, $default, $desc) = @$aref ;
-#		print "Default=$default\n" ;
-
-		## Amend defaults with existing settings
-		if ($settings_href->{$var})
-		{
-			$default = $settings_href->{$var} ;
-		}
-		my $val = $default || "" ;
-		
-		do
-		{
-			print "$var: Please enter the $desc [$val]: " ;
-			my $ans = <STDIN> ;
-			chomp $ans ;
-			if ($ans)
-			{
-				$val = $ans ;
-			}
-		
-		} while (!$val && !$null_valid) ;
-		
-		$settings_href->{$var} = $val ;
-	}
+	_get_settings($settings_href, \@settings, 1) ;
 	
 	## Ask if user wants to amend the extra settings
 	my $get_extra = 0 ;
@@ -381,36 +403,7 @@ sub get_settings
 	}
 
 	## get any default settings
-	foreach my $aref (@extra_settings)
-	{
-		my ($var, $null_valid, $default, $desc) = @$aref ;
-#		print "Default=$default\n" ;
-
-		## Amend defaults with existing settings
-		if ($settings_href->{$var})
-		{
-			$default = $settings_href->{$var} ;
-		}
-		my $val = $default || "" ;
-		
-		if ($get_extra)
-		{
-			do
-			{
-				print "$var: Please enter the $desc [$val]: " ;
-				my $ans = <STDIN> ;
-				chomp $ans ;
-				if ($ans)
-				{
-					$val = $ans ;
-				}
-			
-			} while (!$val && !$null_valid) ;
-		}
-		
-		$settings_href->{$var} = $val ;
-	}
-	
+	_get_settings($settings_href, \@extra_settings, $get_extra) ;
 	
 	## Get the list of all variables
 	my $vars_list = "" ;

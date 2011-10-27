@@ -99,24 +99,29 @@ sub cleanpath
 {
 	my ($pathspec, $vars_href) = @_ ;
 	
+	print "cleanpath($pathspec)\n" if $debug ;
+	
+	# Expand variables
+	$pathspec = expand_path($pathspec, $vars_href) ;
+	
+	print " + after expand: $pathspec\n" if $debug ;
+
 	# Strip out certain chars
 	$pathspec =~ s/[\'\"]//g ;
 	
-	# Replace other chars with space
+	# Replace other chars with 'space'
 	$pathspec =~ s/[\:]/-/g ;
 
-	# Replace multiple spaces with single space
+	# Replace multiple spaces with single 'space'
 	$pathspec =~ s/\s+/ /g ;
 	$pathspec =~ s/[-]+/-/g ;
 	$pathspec =~ s/\s*\-\s+/-/g ;
-	
-	# Expand 
-	$pathspec = expand_path($pathspec, $vars_href) ;
-	
+
 	# Replace multiple //
 	$pathspec =~ s%//%/%g ;
 	$pathspec =~ s%/[-]+/%/%g ;
 	
+	print " + FINAL: $pathspec\n" if $debug ;
 
 	return $pathspec ;
 }
